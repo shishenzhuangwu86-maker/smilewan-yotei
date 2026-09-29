@@ -1,0 +1,1746 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>すまいるわん 週間予定表</title>
+<style>
+  :root {
+    --bg: #f3f4f6; --panel: #fff; --panel2: #fafafa; --input: #fff; --line: #d1d5db; --text: #111827; --muted: #6b7280;
+    --ink: #111827; --ink-text: #fff; --accent: #2563eb; --accent-soft: #eff6ff; --sun: #e60012; --sat: #1e90ff;
+    --danger: #dc2626; --warn-bg: #fef3c7; --warn-text: #92400e;
+    --dup-bg: #fff1f2; --dup-alert-bg: #fee2e2; --dup-alert-text: #991b1b; --dup-alert-line: #fca5a5;
+    --ng-bg: #fff7ed; --ng: #f97316; --ng-alert-bg: #ffedd5; --ng-alert-text: #9a3412; --ng-alert-line: #fdba74;
+    --off-bg: #f9fafb; --off-text: #9ca3af; --th-bg: #f3f4f6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111418; --panel: #1a1e24; --panel2: #20252c; --input: #262b33; --line: #3a414b; --text: #e5e7eb; --muted: #9ca3af;
+      --ink: #e5e7eb; --ink-text: #111418; --accent: #60a5fa; --accent-soft: #1e293b; --sun: #ff5a5f; --sat: #5ab0ff;
+      --danger: #f87171; --warn-bg: #3b2f0b; --warn-text: #fcd34d;
+      --dup-bg: #3a1f22; --dup-alert-bg: #451a1e; --dup-alert-text: #fecaca; --dup-alert-line: #7f1d1d;
+      --ng-bg: #3a2a1a; --ng: #fb923c; --ng-alert-bg: #43230f; --ng-alert-text: #fed7aa; --ng-alert-line: #9a3412;
+      --off-bg: #1c2026; --off-text: #6b7280; --th-bg: #262b33;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111418; --panel: #1a1e24; --panel2: #20252c; --input: #262b33; --line: #3a414b; --text: #e5e7eb; --muted: #9ca3af;
+    --ink: #e5e7eb; --ink-text: #111418; --accent: #60a5fa; --accent-soft: #1e293b; --sun: #ff5a5f; --sat: #5ab0ff;
+    --danger: #f87171; --warn-bg: #3b2f0b; --warn-text: #fcd34d;
+    --dup-bg: #3a1f22; --dup-alert-bg: #451a1e; --dup-alert-text: #fecaca; --dup-alert-line: #7f1d1d;
+    --ng-bg: #3a2a1a; --ng: #fb923c; --ng-alert-bg: #43230f; --ng-alert-text: #fed7aa; --ng-alert-line: #9a3412;
+    --off-bg: #1c2026; --off-text: #6b7280; --th-bg: #262b33;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+
+  /* ====== 画面レイアウト ====== */
+  .app { display: grid; grid-template-columns: 460px minmax(0, 1fr); min-height: 100vh; }
+  .editor { background: var(--panel); border-right: 1px solid var(--line); padding: 14px 16px; overflow-y: auto; max-height: 100vh; min-width: 0; }
+  .preview-wrap { padding: 20px 16px; overflow: auto; display: flex; flex-direction: column; align-items: center; gap: 12px; min-width: 0; }
+  .paper-scroll { max-width: 100%; overflow-x: auto; }
+  @media (max-width: 900px) {
+    .app { grid-template-columns: minmax(0, 1fr); }
+    .editor { max-height: none; border-right: none; border-bottom: 1px solid var(--line); }
+    .preview-wrap { align-items: stretch; }
+    .day-tabs button { font-size: 15px; padding: 6px 0; }
+    #statePop { width: calc(100vw - 32px); left: 16px !important; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  h1 { font-size: 16px; margin: 0 0 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .sync { font-size: 11px; font-weight: normal; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .sync.ok { color: var(--accent); border-color: var(--accent); }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  button { font: inherit; padding: 6px 12px; border: 1px solid var(--line); background: var(--input); color: var(--text); border-radius: 6px; cursor: pointer; }
+  button:hover { background: var(--panel2); }
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button.primary { background: var(--accent); color: var(--ink-text); border-color: var(--accent); font-weight: bold; }
+  button.primary:hover { filter: brightness(.92); }
+  button.danger { color: var(--danger); }
+  button.small { padding: 2px 8px; font-size: 12px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 3px; }
+  input[type=text], select, textarea { width: 100%; font: inherit; padding: 5px 7px; border: 1px solid var(--line); border-radius: 5px; background: var(--input); color: var(--text); }
+  input[type=time], input[type=date] { font: inherit; padding: 4px 6px; border: 1px solid var(--line); border-radius: 5px; background: var(--input); color: var(--text); }
+  textarea { resize: vertical; min-height: 48px; }
+  .row { display: flex; gap: 6px; align-items: center; }
+  .row > * { flex: 1; }
+  .row > .fixed { flex: 0 0 auto; }
+
+  .day-tabs { display: flex; gap: 3px; margin: 14px 0 8px; }
+  .day-tabs button { flex: 1; padding: 8px 0; font-size: 18px; font-weight: bold; border-radius: 6px; }
+  .day-tabs button.active { background: var(--ink); color: var(--ink-text); border-color: var(--ink); }
+  .day-tabs button.has { box-shadow: inset 0 -3px 0 var(--accent); }
+  .day-tabs button.sun { color: var(--sun); } .day-tabs button.sat { color: var(--sat); }
+  .day-tabs button.active.sun, .day-tabs button.active.sat { color: var(--ink-text); }
+
+  .block { border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin-bottom: 10px; background: var(--panel2); }
+  .block h3 { margin: 0 0 6px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
+  .entry { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px; margin-bottom: 8px; }
+  .entry-head { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+  .entry-head .btns { display: flex; gap: 4px; }
+  .check { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text); margin-top: 6px; }
+  .hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .copy-row { display: flex; gap: 6px; align-items: center; margin-top: 8px; font-size: 12px; }
+  .saved-list { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+  .saved-list select { flex: 1; }
+
+  /* ====== 印刷用紙（A4横） ====== */
+  .paper {
+    width: 297mm; height: 210mm; background: #fff; padding: 12mm 16mm;
+    box-shadow: 0 2px 12px rgba(0,0,0,.15);
+    font-family: "MS PGothic", "ＭＳ Ｐゴシック", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+    color: #000; position: relative;
+  }
+  .paper .title { font-size: 30pt; margin: 6mm 0 0 18mm; letter-spacing: 1px; white-space: nowrap; }
+  .paper .title .nm { margin: 0 6mm; }
+  .paper table { border-collapse: collapse; width: 232mm; margin-top: 14mm; table-layout: fixed; }
+  .paper th, .paper td { border: 1.2px solid #000; padding: 0; text-align: center; vertical-align: top; }
+  .paper th.day { font-size: 28pt; font-weight: bold; height: 15mm; vertical-align: middle; line-height: 1; }
+  .paper th.day.sun { color: var(--sun); } .paper th.day.sat { color: var(--sat); }
+  .paper th.jikan { font-size: 12pt; font-weight: bold; height: 6mm; vertical-align: middle; }
+  .paper td.upper { height: 28mm; }
+  .paper td.middle { height: 26mm; }
+  .paper td.lower { height: 24mm; }
+  .paper .ent { font-size: 8.5pt; line-height: 1.22; padding: 1mm 0.5mm 0; white-space: pre-line; }
+  .paper .ent.hl { background: #ffff00; margin: 0 0.5mm; }
+  .paper .ent.hl + .ent, .paper .ent + .ent.hl { margin-top: 1mm; }
+  .paper .footer { position: absolute; right: 20mm; bottom: 22mm; text-align: right; font-weight: bold; line-height: 1.25; }
+  .paper .footer .tel { font-size: 16pt; }
+  .paper .footer .co { font-size: 17pt; }
+
+  @media print {
+    @page { size: A4 landscape; margin: 0; }
+    body { background: #fff; }
+    .app { display: block; }
+    .editor, .preview-wrap > .print-note { display: none !important; }
+    .preview-wrap { padding: 0; }
+    .paper { box-shadow: none; width: 297mm; height: 210mm; page-break-after: avoid; }
+  }
+  .print-note { font-size: 12px; color: var(--muted); }
+
+  /* ====== 訪問記録 ====== */
+  .mode-tabs { display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 2px solid var(--line); }
+  .mode-tabs button { border: none; border-radius: 6px 6px 0 0; padding: 8px 14px; font-weight: bold; color: var(--muted); background: transparent; }
+  .mode-tabs button.active { color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 -2px 0 var(--accent); }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px; font-size: 12px; cursor: pointer; background: var(--input); color: var(--text); user-select: none; }
+  .chip.on { background: var(--accent); color: var(--ink-text); border-color: var(--accent); }
+  .rec-entry { display: flex; gap: 8px; align-items: flex-start; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); margin-bottom: 4px; font-size: 13px; }
+  .rec-entry input { margin-top: 3px; }
+  .rec-entry .sub { color: var(--muted); font-size: 12px; }
+  #recOut { font-family: inherit; min-height: 220px; line-height: 1.5; }
+  details { margin-top: 10px; border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; background: var(--panel2); }
+  summary { cursor: pointer; font-size: 13px; font-weight: bold; }
+  .tpl-row { margin: 6px 0; }
+  .tpl-row label { margin: 0 0 2px; }
+  .hist { border-bottom: 1px solid var(--line); padding: 6px 0; font-size: 12px; }
+  .hist pre { white-space: pre-wrap; margin: 4px 0; font-family: inherit; background: var(--panel); padding: 6px; border-radius: 4px; max-height: 120px; overflow: auto; }
+  .radio-row { display: flex; gap: 12px; font-size: 13px; margin-top: 4px; }
+  #recordView { width: 100%; max-width: 1100px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; overflow-x: auto; }
+  #recordView h2 { font-size: 16px; margin: 0 0 8px; display: flex; justify-content: space-between; align-items: baseline; }
+  #recordView h2 small { font-weight: normal; color: var(--muted); font-size: 12px; }
+  .rec-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .rec-table th, .rec-table td { border: 1px solid var(--line); padding: 4px 6px; vertical-align: top; text-align: left; }
+  .rec-table th { background: var(--th-bg); font-weight: bold; white-space: nowrap; }
+  .rec-table tr.off td { background: var(--off-bg); color: var(--off-text); }
+  .rec-table tr.off textarea { color: var(--off-text); }
+  .rec-table td.dt { white-space: nowrap; }
+  .rec-table td.dt input { width: auto; font: inherit; font-size: 12px; padding: 1px 2px; border: 1px solid transparent; border-radius: 3px; background: transparent; color: var(--text); }
+  .rec-table td.dt input:hover, .rec-table td.dt input:focus { border-color: var(--line); }
+  .rec-table td.staff select { width: auto; max-width: 9em; font: inherit; font-size: 12px; padding: 2px 2px; border: 1px solid transparent; border-radius: 3px; background: transparent; }
+  .rec-table td.staff select:hover, .rec-table td.staff select:focus { border-color: var(--line); background: var(--input); }
+  .rec-table td.kind { min-width: 9em; }
+  .rec-table td.txt { width: 52%; }
+  .rec-table td.txt textarea { width: 100%; min-height: 58px; font: inherit; font-size: 13px; line-height: 1.45; padding: 4px 6px; border: 1px solid transparent; border-radius: 3px; resize: vertical; background: transparent; color: var(--text); }
+  .rec-table td.txt textarea:hover, .rec-table td.txt textarea:focus { border-color: var(--line); }
+  .rec-table td.act { white-space: nowrap; }
+  .rec-table .flag { display: inline-block; font-size: 10px; background: var(--warn-bg); color: var(--warn-text); border-radius: 3px; padding: 0 4px; margin-left: 4px; }
+  .rec-empty { color: var(--muted); padding: 30px; text-align: center; }
+  .rec-table tr.dup td { background: var(--dup-bg); }
+  .rec-table tr.dup td.txt textarea { border-color: var(--danger); background: var(--input); }
+  .dup-badge { display: inline-block; font-size: 11px; color: var(--ink-text); background: var(--danger); border-radius: 3px; padding: 0 5px; margin-bottom: 3px; }
+  .rec-table tr.ng td { background: var(--ng-bg); }
+  .rec-table tr.ng td.txt textarea { border-color: var(--ng); background: var(--input); }
+  .ng-badge { display: inline-block; font-size: 11px; color: var(--ink-text); background: var(--ng); border-radius: 3px; padding: 0 5px; margin: 0 4px 3px 0; }
+  .ng-alert { background: var(--ng-alert-bg); color: var(--ng-alert-text); border: 1px solid var(--ng-alert-line); border-radius: 6px; padding: 6px 10px; margin-bottom: 8px; font-size: 13px; }
+  .dup-alert { background: var(--dup-alert-bg); color: var(--dup-alert-text); border: 1px solid var(--dup-alert-line); border-radius: 6px; padding: 6px 10px; margin-bottom: 8px; font-size: 13px; }
+  #statePop { position: absolute; z-index: 50; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,.18); padding: 10px 12px; width: 460px; max-height: 70vh; overflow: auto; display: none; }
+  #statePop .cat { font-size: 11px; color: var(--muted); margin: 8px 0 3px; }
+  #statePop .cat:first-child { margin-top: 0; }
+  #statePop .head { display: flex; justify-content: space-between; align-items: center; font-size: 12px; margin-bottom: 4px; }
+  #statePop .chip:hover { background: var(--accent-soft); border-color: var(--accent); }
+  .glob-states .chip { margin: 2px 0; }
+  body.mode-record .paper-scroll { display: none; }
+  @media print {
+    body.mode-record #recordView { border: none; padding: 0; max-width: none; }
+    body.mode-record .rec-table th.act, body.mode-record .rec-table td.act, body.mode-record .rec-table th.chk, body.mode-record .rec-table td.chk { display: none; }
+    body.mode-record .rec-table tr.off { display: none; }
+    body.mode-record .rec-table textarea { border: none; resize: none; overflow: hidden; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="editor">
+    <h1>週間予定表 作成ツール <span id="syncStatus" class="sync local" onclick="changePass()" title="（Supabase版）クリックで合言葉を変更">💾 この端末に保存</span></h1>
+    <div class="mode-tabs">
+      <button id="modeSheetBtn" class="active" onclick="setMode('sheet')">📅 予定表</button>
+      <button id="modeRecordBtn" onclick="setMode('record')">📝 訪問記録</button>
+    </div>
+    <div id="sheetPanel">
+    <div class="toolbar">
+      <button class="primary" onclick="window.print()">🖨 印刷する</button>
+      <button onclick="saveCurrent()">💾 保存</button>
+      <button onclick="newSheet()">＋ 新規作成</button>
+      <button onclick="exportJson()">書き出し</button>
+      <button onclick="document.getElementById('importFile').click()">読み込み</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJson(this)">
+      <button onclick="document.getElementById('userCsv').click()">👥 利用者CSV取込</button>
+      <button onclick="document.getElementById('xlsxFile').click()">📗 Excelから一括取込</button>
+      <input type="file" id="xlsxFile" accept=".xlsx,.xls,.xlsm" style="display:none" onchange="importScheduleXlsx(this)">
+      <button onclick="if(event.shiftKey)paperSelfTest();else document.getElementById('paperFile').click()">📄 紙(PDF)から取込</button>
+      <input type="file" id="userCsv" accept=".csv,text/csv" style="display:none" onchange="importUserCsv(this)">
+    </div>
+    <div id="paperStatus2" class="hint" style="display:none;margin-bottom:8px"></div>
+    <details id="sbBox">
+      <summary>🗄 Supabase バックアップ <span id="sbStatus" class="sync local">未設定</span></summary>
+      <div class="hint" style="margin:6px 0">保存のたびにSupabaseへも自動でコピーします（ローカル版のみ。サイト版は通信制限のため不可）。</div>
+      <div class="toolbar" style="margin-bottom:4px">
+        <button class="small" onclick="sbConfigure()">接続設定</button>
+        <button class="small" onclick="sbBackupAll()">全件バックアップ</button>
+        <button class="small" onclick="sbRestore()">Supabaseから復元</button>
+      </div>
+    </details>
+
+    <label>保存済み利用者</label>
+    <div class="saved-list">
+      <select id="savedSelect" onchange="loadSaved(this.value)"><option value="">-- 選択 --</option></select>
+      <button class="danger small" onclick="deleteSaved()">削除</button>
+    </div>
+
+    <label>利用者名（「様」は自動で付きます）</label>
+    <div class="row">
+      <select id="userPick" onchange="if(this.value)pickUser(this.value)"><option value="">（利用者一覧から選ぶ）</option></select>
+    </div>
+    <input type="text" id="userName" placeholder="例：柿崎　彩人" oninput="state.name=this.value; render()" style="margin-top:4px">
+    <div class="hint" id="userMasterInfo">かいポケの「利用者情報」CSVを取り込むと一覧から選べます（利用中の方のみ）。</div>
+
+    <div class="day-tabs" id="dayTabs"></div>
+
+    <div id="dayEditor"></div>
+
+    <div class="copy-row">
+      <span class="fixed">この曜日の内容を</span>
+      <select id="copyTarget" style="flex:1">
+        <option value="1">月</option><option value="2">火</option><option value="3">水</option>
+        <option value="4">木</option><option value="5">金</option><option value="6">土</option><option value="0">日</option>
+      </select>
+      <button class="small" onclick="copyDay()">にコピー</button>
+    </div>
+    <div class="hint">※ 時間を空欄にすると「通院介助／2週に1回」のように内容だけが表示されます。黄色マーカーはチェックで付けられます。</div>
+    </div><!-- /sheetPanel -->
+
+    <div id="recordPanel" style="display:none">
+      <div class="toolbar">
+        <button class="primary" onclick="buildRecords()">📝 記録を生成</button>
+        <button onclick="copyRecordsTsv()">表をコピー</button>
+        <button onclick="exportRecordsXlsx()">Excel書き出し</button>
+        <button id="pdfBtn" onclick="exportRecordsPdf()">PDF保存</button>
+        <button onclick="if(dupConfirm())window.print()">🖨 印刷</button>
+        <button onclick="if(event.shiftKey)paperSelfTest();else document.getElementById('paperFile').click()">📄 紙(PDF)から取込</button>
+      </div>
+      <input type="file" id="paperFile" accept="application/pdf,image/*" style="display:none" onchange="importPaper(this)">
+      <div id="paperStatus" class="hint" style="display:none"></div>
+      <label>利用者（保存済みから選択）</label>
+      <select id="recUser" onchange="loadSaved(this.value)"></select>
+      <label>期間</label>
+      <div class="row">
+        <input type="date" id="recFrom" style="font:inherit;padding:5px;border:1px solid var(--line);border-radius:5px">
+        <span class="fixed">〜</span>
+        <input type="date" id="recTo" style="font:inherit;padding:5px;border:1px solid var(--line);border-radius:5px">
+      </div>
+      <label>担当者（全行に入ります・行ごとに変更可）</label>
+      <div class="row">
+        <select id="recStaff" onchange="lsSet('smilewan_staff',this.value); recRows.forEach(r=>{if(!r.staffEdited)r.staff=this.value}); if(recRows.length)renderRecordView();"></select>
+        <button class="small fixed" onclick="editStaffList()">担当者を編集</button>
+      </div>
+      <div class="row" style="margin-top:6px"><span class="hint" style="margin:0">NG表現（変化なし・お変わりない等）は自動で避け、含まれると橙色で警告します。</span><button class="small fixed" onclick="editNgList()">NG表現を編集</button></div>
+      <label>文章のスタイル</label>
+      <div class="radio-row">
+        <label class="check"><input type="radio" name="recStyle" value="std" checked> 定型（丁寧な記録文）</label>
+        <label class="check"><input type="radio" name="recStyle" value="short"> 短め</label>
+      </div>
+      <label>文の数（最低）</label>
+      <div class="row">
+        <select id="recMinSent" onchange="lsSet('smilewan_minsent',this.value)">
+          <option value="1">1文以上</option><option value="2" selected>2文以上</option><option value="3">3文以上</option><option value="4">4文以上</option>
+        </select>
+        <span class="hint fixed" style="margin:0">足りない分は様子や補足の文を自動で追加</span>
+      </div>
+      <label class="check"><input type="checkbox" id="recIncludeNote" checked> 「月2回のみ」「2週に1回」などの予定も含める（チェック外して選ぶ）</label>
+      <label class="check"><input type="checkbox" id="recClosing" checked> 文末に様子の一文をときどき追加する</label>
+      <label>全行に含める様子（生成時に文末へ追加・複数可）</label>
+      <div class="chips glob-states" id="globStates"></div>
+      <div class="hint">行ごとの様子は、右の表の「😊様子」ボタンから追加できます。</div>
+      <div class="hint" style="margin-top:8px">
+        「📄 紙(PDF)から取込」→ 印刷した週間予定表をスキャンしたPDFを読み取り、予定表に自動で入れます（ログイン不要。読み取った内容は必ず確認してください）。<br>
+        右側に訪問ごとの記録が出ます。文章は直接書き換えられ、「↻」で別の言い回しに変わります。<br>
+        「表をコピー」→ Excelに貼り付け／各行の「📋」→ その文章だけコピー（カイポケ入力用）。<br>
+        Excel書き出しは「カイポケ訪問記録確認.xlsx」と同じ並び（日時／担当／種別＋文章）です。<br>
+        「PDF保存」→ チェックした行をA4縦のPDFファイルとして保存します（記録の控え・提出用）。
+      </div>
+    </div>
+  </div>
+
+  <div class="preview-wrap">
+    <div class="print-note">↓ 印刷プレビュー（A4横）。「印刷する」ボタンでこの用紙だけが印刷されます。</div>
+    <div class="paper-scroll"><div class="paper" id="paper"></div></div>
+    <div id="recordView" style="display:none"></div>
+    <div id="statePop"></div>
+  </div>
+</div>
+
+<script>
+// ===== 外部部品（使うときだけ読み込む。最初の表示を軽くするため） =====
+const LIB = {
+  xlsx: ['https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'],
+  pdfOut: ['https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'],
+  // pdf.worker も読み込んでおくと Worker を使わず画面内で処理できる
+  pdfIn: ['https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'],
+};
+async function loadLib(name) { for (const src of LIB[name]) await loadScriptOnce(src); }
+function loadScriptOnce(src) {
+  return new Promise((ok, ng) => {
+    const had = [...document.scripts].find(s => s.src === src);
+    if (had) { if (had.dataset.loaded) return ok(); had.addEventListener('load', ok); had.addEventListener('error', () => ng(new Error('部品を読み込めませんでした'))); return; }
+    const s = document.createElement('script'); s.src = src;
+    s.onload = () => { s.dataset.loaded = '1'; ok(); }; s.onerror = () => ng(new Error('部品を読み込めませんでした。通信状態を確認してください'));
+    document.head.appendChild(s);
+  });
+}
+
+// ===== 選択肢（ここを編集すれば増やせます） =====
+const SERVICE_TYPES = ['身体', '家事', '入浴', '通院介助', '生活援助', '身体・家事', 'その他'];
+const DETAIL_PRESETS = [
+  '起床介助・服薬等', '朝食準備等', '買い物代行・掃除', '買い物代行・調理', '洗濯・掃除', '洗濯・調理',
+  '洗濯・掃除・調理', '共に行う', '一緒に掃除をする', '共に行う片付け', '調理', '調理（３品）',
+  '台所の片つけ', '調理後の洗い物など', '掃除', '衣類整理等', '入浴後の片付け', '洗濯・服薬声掛け',
+  'お風呂掃除等', '服薬確認', '排泄介助', '更衣介助', '食事介助', '見守り'
+];
+const NOTE_PRESETS = ['', '（月2回のみ）', '2週に1回', '隔週', '月1回', '（月1回のみ）'];
+const DAYS = ['日', '月', '火', '水', '木', '金', '土'];
+const STORAGE_KEY = 'smilewan_weekly_v1';
+
+// ===== 状態 =====
+function emptyEntry() { return { type: '身体', start: '', end: '', detail: '', note: '', hl: false }; }
+const BLOCKS = ['upper', 'middle', 'lower']; // 上段(午前)・中段(昼)・下段(夕方〜夜)
+function emptyDay() { return { upper: [], middle: [], lower: [] }; }
+// 以前の2段のデータ（中段なし）も読めるようにそろえる
+function normDay(d) { d = d || {}; return { upper: d.upper || [], middle: d.middle || [], lower: d.lower || [] }; }
+function dayEntries(d) { return BLOCKS.flatMap(k => (d && d[k]) || []); }
+function emptyState() { return { name: '', days: DAYS.map(emptyDay) }; }
+
+let state = emptyState();
+let currentDay = 1; // 月から
+
+// localStorage が使えない環境（プレビュー等）ではメモリに保持
+const _mem = {};
+function lsGet(k) { try { return localStorage.getItem(k); } catch { return _mem[k] ?? null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch { _mem[k] = v; } }
+// ===== 保存 =====
+// サイト版(claude.ai)では共有データベース(db)に保存して全員で共有。ローカル/未接続時はこの端末(localStorage)に保存
+let DB = null;                       // claude.use('db') の結果
+const cloud = { schedules: null, settings: {} }; // db から届いた最新の内容
+function docId(name) { return btoa(unescape(encodeURIComponent(name))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+function setSyncStatus(text, cls) { const el = document.getElementById('syncStatus'); if (el) { el.textContent = text; el.className = 'sync ' + (cls || ''); } }
+function localStore() { try { return JSON.parse(lsGet(STORAGE_KEY) || '{}'); } catch { return {}; } }
+function getStore() { return (DB && cloud.schedules) ? cloud.schedules : localStore(); }
+async function dbWrite(fn, what) {
+  try { await fn(); return true; }
+  catch (e) {
+    const code = e && e.code;
+    if (code === 'quota_exceeded') alert('共有データベースの上限に達しました。使っていない利用者の予定表を削除してください。');
+    else if (code === 'invalid_argument') alert(`${what}できませんでした。このページの共有設定が「閲覧のみ」の可能性があります（この端末には保存しました）。`);
+    else alert(`${what}できませんでした（${e && e.message || code || '不明なエラー'}）。この端末には保存しました。`);
+    return false;
+  }
+}
+async function saveSchedule(name, data, opt = {}) {
+  const ls = localStore(); ls[name] = data; lsSet(STORAGE_KEY, JSON.stringify(ls));
+  if (!opt.skipSb) sbPush('schedule', name, { name, days: data.days });
+  if (DB) return dbWrite(() => DB.doc('schedules/' + docId(name)).set({ name, days: data.days, updatedAt: new Date().toISOString() }), '共有保存');
+  return true;
+}
+async function removeSchedule(name) {
+  const ls = localStore(); delete ls[name]; lsSet(STORAGE_KEY, JSON.stringify(ls));
+  sbDelete('schedule', name);
+  if (DB) return dbWrite(() => DB.doc('schedules/' + docId(name)).delete(), '削除');
+  return true;
+}
+function getSetting(key, localKey, fallback) {
+  if (DB && cloud.settings[key] && Array.isArray(cloud.settings[key].list)) return cloud.settings[key].list.slice();
+  try { const v = JSON.parse(lsGet(localKey) || 'null'); if (Array.isArray(v)) return v; } catch {}
+  return fallback;
+}
+async function setSetting(key, localKey, list, opt = {}) {
+  lsSet(localKey, JSON.stringify(list));
+  if (!opt.skipSb) sbPush('setting', key, { list });
+  if (DB) { cloud.settings[key] = { list }; return dbWrite(() => DB.doc('settings/' + key).set({ list, updatedAt: new Date().toISOString() }), '共有保存'); }
+  return true;
+}
+// ===== Supabase 保存（GitHub Pages 版）: 合言葉つきの関数(RPC)経由で読み書き =====
+// url/key は build-site.sh が site.config.json から書き込む（claude.ai 版・ローカル版では空のまま）
+const SUPA = {"url": "https://yasmqridfwantepadetx.supabase.co", "key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlhc21xcmlkZndhbnRlcGFkZXR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA2NDcwMzIsImV4cCI6MjEwNjIyMzAzMn0.d0MUIs0V0o__95GkPGeqJPKfUSKShxpCwUmcxWKnHYI"};
+function supaOn() { return !!(SUPA.url && SUPA.key) && !(window.claude && typeof window.claude.use === 'function'); }
+async function supaRpc(fn, args) {
+  const r = await fetch(SUPA.url.replace(/\/$/, '') + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { apikey: SUPA.key, Authorization: 'Bearer ' + SUPA.key, 'Content-Type': 'application/json' }, body: JSON.stringify(args) });
+  if (!r.ok) { const t = await r.text(); const e = new Error(t.slice(0, 200)); if (/invalid passcode/.test(t)) e.code = 'badpass'; throw e; }
+  return r.status === 204 ? null : r.json().catch(() => null);
+}
+// claude.ai の db と同じ形（doc().set/delete・collection().onSnapshot）で使えるようにする
+function supaDB(pass) {
+  const subs = { schedules: [], settings: [] };
+  let timer = null, busy = false;
+  async function refresh() {
+    if (busy) return; busy = true;
+    try {
+      const rows = await supaRpc('smilewan_list', { p_pass: pass }) || [];
+      Object.keys(subs).forEach(k => { const docs = rows.filter(r => r.kind === k).map(r => ({ id: r.name, data: () => r.data })); subs[k].forEach(s => s.cb({ docs })); });
+    } catch (e) { Object.values(subs).flat().forEach(s => s.err && s.err(e)); }
+    finally { busy = false; }
+  }
+  const start = () => { if (!timer) { setTimeout(refresh, 0); timer = setInterval(refresh, 30000); } }; // 30秒ごとに他の人の変更を反映
+  return {
+    doc(path) {
+      const [kind, name] = path.split('/');
+      return {
+        set: async data => { await supaRpc('smilewan_put', { p_pass: pass, p_kind: kind, p_name: name, p_data: data }); refresh(); },
+        delete: async () => { await supaRpc('smilewan_del', { p_pass: pass, p_kind: kind, p_name: name }); refresh(); },
+      };
+    },
+    collection(kind) { return { onSnapshot(cb, err) { (subs[kind] = subs[kind] || []).push({ cb, err }); start(); } }; },
+  };
+}
+async function supaConnect() {
+  let pass = lsGet('smilewan_pass') || '';
+  for (;;) {
+    if (!pass) { pass = prompt('合言葉を入力してください（事業所で共有している合言葉）'); if (pass === null) return null; pass = pass.trim(); }
+    try { await supaRpc('smilewan_list', { p_pass: pass }); lsSet('smilewan_pass', pass); return supaDB(pass); }
+    catch (e) { if (e.code === 'badpass') { alert('合言葉が違います'); pass = ''; continue; } alert('保存先(Supabase)に接続できませんでした。通信状態を確認してください。\n' + e.message); return null; }
+  }
+}
+function changePass() {
+  if (!supaOn()) return;
+  const v = prompt('新しい合言葉を入力してください（事業所で決めた合言葉）'); if (v === null) return;
+  lsSet('smilewan_pass', v.trim()); location.reload();
+}
+async function initCloud() {
+  try { if (window.claude && typeof window.claude.use === 'function') DB = await window.claude.use('db'); } catch { DB = null; }
+  if (!DB && supaOn()) { setSyncStatus('☁ 保存先に接続中…', 'wait'); DB = await supaConnect(); }
+  if (!DB) { setSyncStatus(supaOn() ? '💾 この端末に保存（合言葉が未入力です）' : '💾 この端末に保存（共有なし）', 'local'); return; }
+  setSyncStatus('☁ 共有データベースに接続中…', 'wait');
+  DB.collection('schedules').onSnapshot(snap => {
+    const m = {};
+    snap.docs.forEach(d => { const b = d.data(); if (b && b.name && Array.isArray(b.days)) m[b.name] = { name: b.name, days: b.days, updatedAt: b.updatedAt }; });
+    cloud.schedules = m;
+    // 共有側にまだ無く、この端末だけにある予定表は自動で共有側へ送る（初回移行）
+    const ls = localStore();
+    Object.keys(ls).forEach(n => { if (!m[n] && !cloud._migrated) DB.doc('schedules/' + docId(n)).set({ name: n, days: ls[n].days, updatedAt: new Date().toISOString() }).catch(() => {}); });
+    cloud._migrated = true;
+    refreshSavedList(); refreshUserPick(); if (mode === 'record') refreshRecUsers();
+    setSyncStatus(`☁ 共有保存（予定表 ${Object.keys(m).length}名）`, 'ok');
+  }, () => { DB = null; cloud.schedules = null; setSyncStatus('💾 この端末に保存（共有に接続できません）', 'local'); refreshSavedList(); });
+  DB.collection('settings').onSnapshot(snap => {
+    snap.docs.forEach(d => { cloud.settings[d.id] = d.data(); });
+    if (document.getElementById('recStaff').options.length) refreshStaffSelect();
+    refreshUserPick(); if (recRows.length) renderRecordView();
+  }, () => {});
+}
+function refreshSavedList() {
+  const sel = document.getElementById('savedSelect');
+  const store = getStore();
+  const cur = state.name;
+  sel.innerHTML = '<option value="">-- 選択 --</option>' +
+    Object.keys(store).sort((a, b) => a.localeCompare(b, 'ja')).map(n => `<option value="${esc(n)}" ${n === cur ? 'selected' : ''}>${esc(n)}</option>`).join('');
+}
+async function saveCurrent() {
+  const name = (state.name || '').trim();
+  if (!name) { alert('利用者名を入力してください'); return; }
+  const ok = await saveSchedule(name, { name, days: state.days });
+  if (!DB) { refreshSavedList(); refreshUserPick(); }
+  if (ok) alert(`「${name}」を保存しました${DB ? '（共有）' : ''}`);
+}
+function loadSaved(name) {
+  if (!name) return;
+  const store = getStore();
+  if (store[name]) { state = JSON.parse(JSON.stringify({ name: store[name].name || name, days: store[name].days })); document.getElementById('userName').value = state.name; currentDay = 1; recRows = []; render(); if (mode === 'record') { refreshRecUsers(); renderRecordView(); } }
+}
+async function deleteSaved() {
+  const sel = document.getElementById('savedSelect'); const name = sel.value;
+  if (!name) return;
+  if (!confirm(`「${name}」を削除しますか？`)) return;
+  await removeSchedule(name); if (!DB) refreshSavedList();
+}
+function newSheet() {
+  if (hasContent() && !confirm('入力内容を消して新規作成しますか？（保存していない内容は失われます）')) return;
+  state = emptyState(); currentDay = 1;
+  document.getElementById('userName').value = '';
+  document.getElementById('savedSelect').value = '';
+  render();
+}
+function hasContent() { return state.name || state.days.some(d => dayEntries(d).length); }
+
+
+// 保存: claude.ai上(サイト版)は downloads 機能で保存確認を出す。ローカルで開いた場合は通常のダウンロード
+async function download(blob, name) {
+  let dl = null;
+  try { if (window.claude && typeof window.claude.use === 'function') dl = await window.claude.use('downloads'); } catch { dl = null; }
+  if (dl) {
+    try { await dl.save({ filename: name, data: blob }); return true; }
+    catch (e) {
+      if (e && e.code === 'declined') return false;
+      if (e && e.code === 'rate_limited') { alert('前の保存確認が開いています。閉じてからもう一度押してください'); return false; }
+      alert('保存できませんでした: ' + (e && e.message || '')); return false;
+    }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); return true;
+}
+function exportJson() {
+  const store = getStore();
+  const blob = new Blob([JSON.stringify({ current: state, saved: store, users: getUserMaster(), staff: getStaffList() }, null, 2)], { type: 'application/json' });
+  download(blob, `週間予定表_バックアップ_${new Date().toISOString().slice(0, 10)}.json`);
+}
+function importJson(input) {
+  const f = input.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = async () => {
+    try {
+      const data = JSON.parse(r.result);
+      for (const [n, v] of Object.entries(data.saved || {})) await saveSchedule(n, { name: n, days: v.days });
+      refreshSavedList();
+      if (Array.isArray(data.users) && data.users.length) await setUserMaster(data.users);
+      if (Array.isArray(data.staff) && data.staff.length) await setStaffList(data.staff);
+      refreshUserPick();
+      if (data.current) { state = data.current; document.getElementById('userName').value = state.name; render(); }
+      alert('読み込みました');
+    } catch { alert('読み込みに失敗しました'); }
+  };
+  r.readAsText(f); input.value = '';
+}
+
+
+
+// ===== Supabase バックアップ（ローカル版のみ・REST/PostgREST 直叩き） =====
+// テーブル: smilewan_backup(key text primary key, kind text, name text, data jsonb, updated_at timestamptz)
+const SB_TABLE = 'smilewan_backup';
+function sbConf() { try { return JSON.parse(lsGet('smilewan_sb') || 'null') || {}; } catch { return {}; } }
+function sbReady() { const c = sbConf(); return !!(c.url && c.key) && !(window.claude && typeof window.claude.use === 'function'); }
+function sbSetStatus(text, cls) { const el = document.getElementById('sbStatus'); if (el) { el.textContent = text; el.className = 'sync ' + (cls || ''); } }
+function sbHeaders(c) { return { apikey: c.key, Authorization: 'Bearer ' + c.key, 'Content-Type': 'application/json' }; }
+async function sbFetch(path, opt = {}) {
+  const c = sbConf();
+  const r = await fetch(c.url.replace(/\/$/, '') + '/rest/v1/' + path, { ...opt, headers: { ...sbHeaders(c), ...(opt.headers || {}) } });
+  if (!r.ok) throw new Error(`${r.status} ${(await r.text()).slice(0, 200)}`);
+  return r.status === 204 ? null : r.json();
+}
+async function sbUpsert(rows) {
+  return sbFetch(SB_TABLE, { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(rows) });
+}
+async function sbPush(kind, name, data) {
+  if (!sbReady()) return;
+  try { await sbUpsert([{ key: kind + ':' + name, kind, name, data, updated_at: new Date().toISOString() }]); sbSetStatus('🗄 Supabase 同期済 ' + new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }), 'ok'); }
+  catch (e) { sbSetStatus('🗄 Supabase エラー', 'local'); console.warn('supabase', e); }
+}
+async function sbDelete(kind, name) {
+  if (!sbReady()) return;
+  try { await sbFetch(`${SB_TABLE}?key=eq.${encodeURIComponent(kind + ':' + name)}`, { method: 'DELETE' }); }
+  catch (e) { console.warn('supabase', e); }
+}
+function sbConfigure() {
+  if (window.claude && typeof window.claude.use === 'function') { alert('サイト版（claude.ai）では外部サーバーへの通信が制限されているため、Supabaseはローカル版（index.html）でのみ使えます。'); return; }
+  const c = sbConf();
+  const url = prompt('Supabase の Project URL（例: https://xxxx.supabase.co）', c.url || ''); if (url === null) return;
+  const key = prompt('Supabase の anon (public) キー', c.key || ''); if (key === null) return;
+  lsSet('smilewan_sb', JSON.stringify({ url: url.trim(), key: key.trim() }));
+  sbCheck();
+}
+async function sbCheck() {
+  if (!sbReady()) { sbSetStatus(window.claude && window.claude.use ? 'サイト版では使えません' : '未設定', 'local'); return; }
+  try { await sbFetch(`${SB_TABLE}?select=key&limit=1`); sbSetStatus('🗄 Supabase 接続OK', 'ok'); }
+  catch (e) { sbSetStatus('🗄 Supabase 接続エラー', 'local'); alert('Supabaseに接続できませんでした。URL・キー・テーブル(smilewan_backup)を確認してください。\n' + e.message); }
+}
+async function sbBackupAll() {
+  if (!sbReady()) { sbConfigure(); if (!sbReady()) return; }
+  const store = getStore(); const now = new Date().toISOString();
+  const rows = Object.keys(store).map(n => ({ key: 'schedule:' + n, kind: 'schedule', name: n, data: { name: n, days: store[n].days }, updated_at: now }));
+  rows.push({ key: 'setting:users', kind: 'setting', name: 'users', data: { list: getUserMaster() }, updated_at: now });
+  rows.push({ key: 'setting:staff', kind: 'setting', name: 'staff', data: { list: getStaffList() }, updated_at: now });
+  rows.push({ key: 'setting:ng', kind: 'setting', name: 'ng', data: { list: getNgList() }, updated_at: now });
+  try { await sbUpsert(rows); sbSetStatus('🗄 Supabase 同期済 ' + new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }), 'ok'); alert(`Supabaseへバックアップしました（予定表 ${Object.keys(store).length}名＋設定）`); }
+  catch (e) { sbSetStatus('🗄 Supabase エラー', 'local'); alert('バックアップに失敗しました\n' + e.message); }
+}
+async function sbRestore() {
+  if (!sbReady()) { sbConfigure(); if (!sbReady()) return; }
+  let rows;
+  try { rows = await sbFetch(`${SB_TABLE}?select=key,kind,name,data`); } catch (e) { alert('読み込みに失敗しました\n' + e.message); return; }
+  const sch = rows.filter(r => r.kind === 'schedule');
+  if (!confirm(`Supabaseの内容を取り込みます（予定表 ${sch.length}名＋設定）。同じ名前の予定表は上書きされます。よろしいですか？`)) return;
+  for (const r of sch) await saveSchedule(r.name, { name: r.name, days: r.data.days }, { skipSb: true });
+  for (const r of rows.filter(r => r.kind === 'setting')) {
+    if (r.name === 'users') await setUserMaster(r.data.list || [], { skipSb: true });
+    if (r.name === 'staff') await setStaffList(r.data.list || [], { skipSb: true });
+    if (r.name === 'ng') await setSetting('ng', 'smilewan_ng_list', r.data.list || [], { skipSb: true });
+  }
+  refreshSavedList(); refreshUserPick(); alert('復元しました');
+}
+
+// ===== 利用者マスタ（かいポケ 利用者情報CSV） =====
+function getUserMaster() { return getSetting('users', 'smilewan_users', []); }
+function setUserMaster(list, opt) { return setSetting('users', 'smilewan_users', list, opt); }
+async function readTextFile(file) {
+  const buf = await file.arrayBuffer();
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch { return new TextDecoder('shift_jis').decode(buf); }
+}
+function parseCSV(text) {
+  const rows = []; let row = [], field = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else q = false; } else field += c; }
+    else if (c === '"') q = true;
+    else if (c === ',') { row.push(field); field = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(field); rows.push(row); row = []; field = ''; }
+    else field += c;
+  }
+  if (field !== '' || row.length) { row.push(field); rows.push(row); }
+  const head = (rows.shift() || []).map(h => h.replace(/^﻿/, '').trim());
+  return rows.filter(r => r.some(v => v !== '')).map(r => Object.fromEntries(head.map((h, i) => [h, (r[i] ?? '').trim()])));
+}
+async function importUserCsv(input) {
+  const f = input.files[0]; if (!f) return; input.value = '';
+  let rows;
+  try { rows = parseCSV(await readTextFile(f)); } catch { alert('CSVを読み込めませんでした'); return; }
+  if (!rows.length) { alert('CSVにデータ行がありません'); return; }
+  const heads = Object.keys(rows[0]);
+  const nameCol = heads.find(h => h === '利用者名') || heads.find(h => /利用者|氏名|名前/.test(h));
+  if (!nameCol) { alert('利用者名の列が見つかりません。\nこのCSVの列: ' + heads.join(' / ') + '\n\nかいポケの「利用者情報」CSVを選んでください。'); return; }
+  const stCol = heads.find(h => h === '利用者状態');
+  const kanaCol = heads.find(h => h === '利用者カナ');
+  const list = []; let inactive = 0;
+  rows.forEach(r => {
+    const name = (r[nameCol] || '').replace(/\s+/g, ' ').trim(); if (!name) return;
+    if (stCol && r[stCol] && !/利用中/.test(r[stCol])) { inactive++; return; }
+    list.push({ name, kana: kanaCol ? r[kanaCol] : '' });
+  });
+  list.sort((a, b) => (a.kana || a.name).localeCompare(b.kana || b.name, 'ja'));
+  await setUserMaster(list); refreshUserPick();
+  alert(`利用者CSVを取り込みました\n利用中: ${list.length}名${inactive ? `\n利用停止などで除外: ${inactive}名` : ''}`);
+}
+function refreshUserPick() {
+  const sel = document.getElementById('userPick'); const master = getUserMaster(); const store = getStore();
+  const cur = (state.name || '').trim();
+  sel.innerHTML = '<option value="">（利用者一覧から選ぶ）</option>' +
+    master.map(u => `<option value="${esc(u.name)}" ${u.name === cur ? 'selected' : ''}>${esc(u.name)}${store[u.name] ? '　✔予定表あり' : ''}</option>`).join('');
+  document.getElementById('userMasterInfo').textContent = master.length
+    ? `利用者マスタ: ${master.length}名（✔は予定表を保存済み）。増減があれば再度CSVを取り込んでください。`
+    : 'かいポケの「利用者情報」CSVを取り込むと一覧から選べます（利用中の方のみ）。';
+}
+function pickUser(name) {
+  const store = getStore();
+  if (store[name]) { loadSaved(name); document.getElementById('savedSelect').value = name; return; }
+  if (hasContent() && (state.name || '').trim() !== name && !confirm(`「${name}」の予定表を新しく作ります。今の入力内容（未保存分）は消えますがよろしいですか？`)) { refreshUserPick(); return; }
+  state = emptyState(); state.name = name; currentDay = 1;
+  document.getElementById('userName').value = name; document.getElementById('savedSelect').value = '';
+  render();
+}
+
+// ===== 編集 =====
+function addEntry(block) { state.days[currentDay][block].push(emptyEntry()); render(); }
+function removeEntry(block, i) { state.days[currentDay][block].splice(i, 1); render(); }
+function moveEntry(block, i, dir) {
+  const arr = state.days[currentDay][block]; const j = i + dir;
+  if (j < 0 || j >= arr.length) return;
+  [arr[i], arr[j]] = [arr[j], arr[i]]; render();
+}
+function setField(block, i, key, val) { state.days[currentDay][block][i][key] = val; renderPaper(); updateTabMarks(); }
+function copyDay() {
+  const to = +document.getElementById('copyTarget').value;
+  if (to === currentDay) { alert('同じ曜日です'); return; }
+  const src = state.days[currentDay];
+  if (dayEntries(state.days[to]).length) {
+    if (!confirm(`${DAYS[to]}曜日の内容を上書きしますか？`)) return;
+  }
+  state.days[to] = JSON.parse(JSON.stringify(src));
+  render();
+}
+
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+function renderTabs() {
+  const el = document.getElementById('dayTabs');
+  el.innerHTML = [1, 2, 3, 4, 5, 6, 0].map(d => {
+    const cls = ['', d === currentDay ? 'active' : '', d === 0 ? 'sun' : d === 6 ? 'sat' : '', dayHas(d) ? 'has' : ''].join(' ');
+    return `<button class="${cls}" data-d="${d}" onclick="currentDay=${d}; render()">${DAYS[d]}</button>`;
+  }).join('');
+}
+function dayHas(d) { return dayEntries(state.days[d]).length; }
+function updateTabMarks() {
+  document.querySelectorAll('#dayTabs button').forEach(b => b.classList.toggle('has', !!dayHas(+b.dataset.d)));
+}
+
+function renderEditor() {
+  const day = state.days[currentDay];
+  const blockHtml = (key, label) => `
+    <div class="block">
+      <h3><span>${label}</span><button class="small" onclick="addEntry('${key}')">＋ 追加</button></h3>
+      ${day[key].length === 0 ? '<div class="hint">（なし）</div>' : ''}
+      ${day[key].map((e, i) => entryHtml(key, i, e, day[key].length)).join('')}
+    </div>`;
+  document.getElementById('dayEditor').innerHTML =
+    blockHtml('upper', `${DAYS[currentDay]}曜日　上段（午前）`) +
+    blockHtml('middle', `${DAYS[currentDay]}曜日　中段（昼）`) +
+    blockHtml('lower', `${DAYS[currentDay]}曜日　下段（夕方〜夜）`);
+}
+function entryHtml(block, i, e, n) {
+  const opt = (list, cur) => list.map(v => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${v === '' ? '（なし）' : esc(v)}</option>`).join('');
+  const typeIsPreset = SERVICE_TYPES.includes(e.type);
+  return `
+  <div class="entry">
+    <div class="entry-head"><span>サービス ${i + 1}</span>
+      <div class="btns">
+        <button class="small" ${i === 0 ? 'disabled' : ''} onclick="moveEntry('${block}',${i},-1)">↑</button>
+        <button class="small" ${i === n - 1 ? 'disabled' : ''} onclick="moveEntry('${block}',${i},1)">↓</button>
+        <button class="small danger" onclick="removeEntry('${block}',${i})">削除</button>
+      </div>
+    </div>
+    <label>種別</label>
+    <div class="row">
+      <select onchange="setField('${block}',${i},'type',this.value); if(this.value==='その他'){this.nextElementSibling.style.display='';this.nextElementSibling.focus();}else{this.nextElementSibling.style.display='none';}">
+        ${opt(SERVICE_TYPES, typeIsPreset ? e.type : 'その他')}
+      </select>
+      <input type="text" placeholder="種別を入力" value="${typeIsPreset ? '' : esc(e.type)}" style="display:${typeIsPreset ? 'none' : ''}"
+        oninput="setField('${block}',${i},'type',this.value)">
+    </div>
+    <label>時間（空欄なら表示しない）</label>
+    <div class="row">
+      <input type="time" step="300" value="${esc(e.start)}" onchange="setField('${block}',${i},'start',this.value)">
+      <span class="fixed">〜</span>
+      <input type="time" step="300" value="${esc(e.end)}" onchange="setField('${block}',${i},'end',this.value)">
+    </div>
+    <label>内容（複数行OK・候補から選ぶか入力）</label>
+    <input type="text" list="detailList" placeholder="候補を選ぶと下に追加されます" onchange="if(this.value){const t=document.getElementById('det-${block}-${i}');t.value=(t.value?t.value+'\\n':'')+this.value;setField('${block}',${i},'detail',t.value);this.value='';}">
+    <textarea id="det-${block}-${i}" oninput="setField('${block}',${i},'detail',this.value)">${esc(e.detail)}</textarea>
+    <label>備考</label>
+    <div class="row">
+      <select onchange="setField('${block}',${i},'note',this.value); this.nextElementSibling.value=this.value;">${opt(NOTE_PRESETS.includes(e.note) ? NOTE_PRESETS : [...NOTE_PRESETS, e.note], e.note)}</select>
+      <input type="text" placeholder="自由入力" value="${esc(e.note)}" oninput="setField('${block}',${i},'note',this.value)">
+    </div>
+    <label class="check"><input type="checkbox" ${e.hl ? 'checked' : ''} onchange="setField('${block}',${i},'hl',this.checked)"> 黄色マーカーを付ける（通院介助など）</label>
+  </div>`;
+}
+
+// ===== 用紙描画 =====
+function fmtTime(t) { if (!t) return ''; const [h, m] = t.split(':'); return `${+h}:${m}`; }
+function entryText(e) {
+  const lines = [];
+  if (e.type) lines.push(e.type);
+  if (e.start || e.end) lines.push(`${fmtTime(e.start)}〜${fmtTime(e.end)}`);
+  if (e.detail) lines.push(...e.detail.split('\n').filter(Boolean));
+  if (e.note) lines.push(e.note);
+  return lines.join('\n');
+}
+function renderPaper() {
+  const name = (state.name || '').trim();
+  const cell = (d, key) => `<td class="${key}">${state.days[d][key].map(e => `<div class="ent ${e.hl ? 'hl' : ''}">${esc(entryText(e))}</div>`).join('')}</td>`;
+  document.getElementById('paper').innerHTML = `
+    <div class="title">週間予定表（<span class="nm">${esc(name)}</span>様）</div>
+    <table>
+      <tr>${DAYS.map((d, i) => `<th class="day ${i === 0 ? 'sun' : i === 6 ? 'sat' : ''}">${d}</th>`).join('')}</tr>
+      <tr>${DAYS.map(() => `<th class="jikan">時間</th>`).join('')}</tr>
+      <tr>${DAYS.map((_, i) => cell(i, 'upper')).join('')}</tr>
+      <tr>${DAYS.map((_, i) => cell(i, 'middle')).join('')}</tr>
+      <tr>${DAYS.map((_, i) => cell(i, 'lower')).join('')}</tr>
+    </table>
+    <div class="footer"><div class="tel">TEL:080-4135-4037</div><div class="co">訪問介護すまいるわん</div></div>`;
+  document.title = name ? `週間予定表_${name}` : '週間予定表 作成ツール';
+}
+
+function render() { state.days = DAYS.map((_, i) => normDay(state.days && state.days[i])); renderTabs(); renderEditor(); renderPaper(); refreshUserPick(); }
+
+// datalist
+const dl = document.createElement('datalist'); dl.id = 'detailList';
+dl.innerHTML = DETAIL_PRESETS.map(v => `<option value="${esc(v)}">`).join('');
+document.body.appendChild(dl);
+
+
+// ================= 訪問記録 =================
+let mode = 'sheet';
+let recRows = [];
+const pageStyle = document.createElement('style'); document.head.appendChild(pageStyle);
+function setMode(m) {
+  mode = m;
+  document.body.classList.toggle('mode-record', m === 'record');
+  document.getElementById('sheetPanel').style.display = m === 'sheet' ? '' : 'none';
+  document.getElementById('recordPanel').style.display = m === 'record' ? '' : 'none';
+  document.getElementById('recordView').style.display = m === 'record' ? '' : 'none';
+  document.getElementById('modeSheetBtn').classList.toggle('active', m === 'sheet');
+  document.getElementById('modeRecordBtn').classList.toggle('active', m === 'record');
+  document.querySelector('.print-note').textContent = m === 'record'
+    ? '↓ 訪問記録（チェックした行だけが印刷・書き出しされます）'
+    : '↓ 印刷プレビュー（A4横）。「印刷する」ボタンでこの用紙だけが印刷されます。';
+  pageStyle.textContent = m === 'record' ? '@page { size: A4 portrait; margin: 12mm; }' : '@page { size: A4 landscape; margin: 0; }';
+  if (m === 'record') {
+    refreshRecUsers();
+    if (!document.getElementById('recFrom').value) {
+      const now = new Date(); const y = now.getFullYear(), mo = now.getMonth();
+      document.getElementById('recFrom').value = `${y}-${String(mo + 1).padStart(2, '0')}-01`;
+      document.getElementById('recTo').value = `${y}-${String(mo + 1).padStart(2, '0')}-${String(new Date(y, mo + 1, 0).getDate()).padStart(2, '0')}`;
+    }
+    refreshStaffSelect();
+    try { const ms = lsGet('smilewan_minsent'); if (ms) document.getElementById('recMinSent').value = ms; } catch {}
+    renderRecordView();
+  }
+}
+function refreshRecUsers() {
+  const sel = document.getElementById('recUser');
+  const names = Object.keys(getStore()).sort((a, b) => a.localeCompare(b, 'ja'));
+  const cur = (state.name || '').trim();
+  const opts = names.map(n => `<option value="${esc(n)}" ${n === cur ? 'selected' : ''}>${esc(n)}</option>`);
+  if (cur && !names.includes(cur)) opts.unshift(`<option value="" selected>${esc(cur)}（未保存）</option>`);
+  if (!opts.length) opts.push('<option value="">（予定表を保存すると選べます）</option>');
+  sel.innerHTML = opts.join('');
+}
+
+// ---- 文例バンク（ここに文を足すと言い回しが増えます） ----
+const PB = {
+  起床: [
+    '起床時の様子を確認し、本人の体調や動作状況に配慮しながら起床介助を行った。',
+    '起床時の声かけを行い、本人の状態を確認しながら必要な身体介助を実施した。',
+    '本人への声かけ及び状態確認を行い、起床時に必要な身体介助を実施した。',
+    '訪問時に本人へ挨拶し、起床状況と体調を確認した。',
+    '朝の訪問時に本人へ声を掛け、起床後の状態を確認した。',
+    '訪問時、声掛けにて起床を促し体調を確認した。洗面までの移動は見守り、安全を確認した。',
+    '本人へ起床の声かけを行い、状態を確認しながら必要な身体介助を実施した。',
+    '朝の訪問で本人の起床状況を確認し、身支度を始められるよう声掛けを行った。',
+  ],
+  服薬: [
+    '服薬について確認・声掛けを行い、安全に一日の生活を開始できるよう支援した。',
+    '服薬について声掛け・確認を実施し、落ち着いて朝の身支度ができるよう支援した。',
+    '服薬状況を確認し、飲み忘れがないよう声掛けを行った。',
+    '服薬の確認を実施し、本人のペースに合わせて身支度を支援した。',
+    '服薬についても確認し、本人が自身で行う動作を見守った。',
+  ],
+  服薬声掛け: [
+    '服薬の声掛けと確認を行い、飲み忘れがないことを確認した。',
+    '就寝前の服薬について声掛けを行い、服用を確認した。',
+    '服薬の声掛けを行い、服用されたことを確認して終了した。',
+  ],
+  身支度: [
+    '本人ができる動作については見守りを行い、必要な部分のみ介助することで安全に身支度を進められるよう支援した。',
+    '本人の動作を尊重し、急がせることなく本人のペースに合わせて朝の身支度を支援した。',
+    '洗面や着替えなどの身支度を促し、本人の自主性を尊重しながら必要な部分のみ支援した。',
+    '本人が自分で行える動作は見守り、必要な部分についてのみ支援を行った。',
+  ],
+  朝食: [
+    '朝食準備等を行った。本人の希望を確認しながら朝食準備を実施し、必要な家事援助を行った。',
+    '朝食準備等の家事援助を実施した。必要な準備と片付けを行い、本人がその後の生活を過ごしやすいよう環境を整えた。',
+    '本人の希望を確認し、朝食を準備した。食事後は使用した食器を片付け、台所を整理した。',
+    '朝食を準備し、本人が落ち着いて食事できるよう環境を整えた。食後は食器を片付け、台所周辺を整理した。',
+    '朝食の準備を行い、食卓周辺を整えた。食後は使用した食器を片付け、台所内の整理を実施した。',
+    '朝食準備等を実施した。本人の生活状況や希望を確認しながら朝食準備を行い、必要な家事援助を実施した。',
+  ],
+  昼食: [
+    '昼食を準備し、本人が食事を取りやすいよう環境を整えた。食後は使用した食器を片付けた。',
+    '昼食準備を行い、居室・卓上・台所の清掃を実施した。必要な声掛けを行いながら対応した。',
+    '冷蔵庫の食材を確認しながらメニューを決め、昼食を調理した。食後の片付けまで行った。',
+  ],
+  夕食: [
+    '夕食を準備し、本人が食事を取りやすいよう卓上を整えた。食後は食器を片付け、台所を整理した。',
+    '本人の希望を確認しながら夕食の調理を行った。食後の片付けまで実施した。',
+  ],
+  調理: [
+    '冷蔵庫の食材を確認しながらメニューを決め、調理を行った。',
+    '本人の希望を確認しながら調理を行い、食事を取りやすいよう卓上を整えた。',
+    '調理を行い、食後は使用した調理器具や食器を片付けて台所を整理した。',
+    '本人と相談してメニューを決め、調理を実施した。会話をしながら落ち着いて進められた。',
+  ],
+  入浴: [
+    '入浴前の声掛けを行い、本人の体調を確認した。入浴準備や浴室までの移動を見守り、安全に配慮して支援した。入浴後は着替え等について必要に応じて声掛け・見守りを行った。',
+    '入浴前に体調確認を行い、本人へ声掛けをして入浴準備を整えた。必要な部分のみ介助した。入浴後は更衣を見守り、水分補給を促した。顔色は良く、ふらつきもなかった。',
+    '入浴に必要な準備をし、安全に浴室へ移動。洗身・洗髪は本人ができる部分は見守り、必要な箇所については介助を行いながら進めた。',
+    '本人の体調を確認し、入浴の声掛けを行った。本人の様子を見ながら入浴介助を実施し、安全に配慮して対応した。',
+    '入浴前に体調や表情を確認し浴室へ移動された。入浴中は一部洗髪介助を行い、表情穏やかに入浴されていた。入浴後は水分補給を促した。',
+    '本人と入浴の流れ・体調・表情を確認し、浴室へ移動。洗髪・洗身は一部お手伝いし、ゆっくりと入浴された。',
+    '浴室までの移動を見守り、洗身・洗髪の洗い残しがないよう声掛けを行った。入浴後はふらつきがないことを確認し、水分補給を促した。',
+  ],
+  入浴後片付け: [
+    '入浴後の衣類や使用物品の片付けを行い、本人ができる部分については自身で整理できるよう見守った。必要な家事支援を行い、本人が落ち着いて過ごせるよう生活環境を整えた。',
+    '入浴後の片付けを行い、使用した場所を整理して生活環境を整えた。',
+    '本人の生活状況を確認しながら必要な家事援助を実施した。入浴後の片付けを行い、浴室内を整えた。',
+    '入浴後の片付けを行い、居室内の環境を整えた。',
+    '入浴後の片付けと浴室の清掃を行い、使用した物品を元の場所に戻した。',
+  ],
+  買い物: [
+    '訪問時、体調と買い出しの内容を確認した。主に食料品と日用品を購入し、お釣りとレシートを確認していただいた。',
+    '本人の希望を確認して買い物代行を行った。購入した品物を一緒に確認し、お釣りを渡して終了した。',
+    '買い物代行を実施した。必要な食料品・日用品を購入し、本人と品物・お釣りを確認した。',
+    '買い物の内容を本人と確認してから代行に出た。帰宅後、購入品を冷蔵庫等に収納し、お釣りを確認していただいた。',
+  ],
+  掃除: [
+    '居室・台所・トイレ等の清掃を行い、生活環境を整えた。',
+    '本人に確認を行いながら居室の掃除をさせていただき、清潔な環境を整えた。',
+    '掃除を実施し、使用した場所を整理して生活スペースを使いやすく整えた。',
+    '清掃箇所を本人と確認し、居室内の掃除・ゴミ出しを行った。',
+    '台所・卓上など気になる箇所を清掃し、居室内を整えた。',
+  ],
+  洗濯: [
+    '衣類の洗濯を行い、乾いた衣類は畳んで収納場所を確認しながら片付けた。',
+    '洗濯を行い、洗濯物を干した。乾いていた衣類は畳んで整理した。',
+    '洗濯物を回している間に他の家事援助を実施し、洗濯後は本人と確認しながら干した。',
+    '洗濯・洗濯物の取り込みを行い、衣類を畳んで整理した。',
+  ],
+  衣類整理: [
+    '衣類の整理を行い、本人と確認しながら収納場所に片付けた。',
+    '衣類整理等を実施し、季節に合った衣類が取り出しやすいよう整えた。',
+  ],
+  共に: [
+    '本人と共に行い、できる部分は本人に行っていただき、難しい部分を援助した。',
+    '本人と一緒に作業を行い、自立支援の観点から見守りを中心に対応した。',
+    '本人と分担しながら行い、本人ができることは見守り、必要な場面のみ手を添えた。',
+  ],
+  洗い物: [
+    '調理後の洗い物を行い、台所を整理した。',
+    '使用した食器を洗って片付け、調理場所を整理した。',
+  ],
+  就寝: [
+    '夕食の摂取状況を確認し、就寝に向けた準備を進めた。体調に配慮しながら更衣等の身支度について声掛けを行い、必要な介助を行った。',
+    '訪問時、体調確認し就寝準備を行った。洗面へ声掛けにて誘導し、移動は安全に注意して見守った。就寝前の服薬を促して終了した。',
+    '就寝前の本人のペースにあわせ準備を進め、寝室内を整え、翌朝まで過ごしやすい環境を整えた。',
+  ],
+  通院: [
+    '通院介助を実施した。医療機関までの移動を見守り、受付・受診に付き添った。帰宅後は顔色・表情を確認し、疲れの訴えはなかった。',
+    '通院に付き添い、移動時の安全に配慮した。受診内容を本人と確認し、次回の予定を共有した。',
+  ],
+  排泄: ['排泄介助を行い、清潔を保てるよう支援した。皮膚は発赤や傷もなく、きれいな状態だった。', '排泄の声掛け・見守りを行い、必要な場面で介助した。'],
+  更衣: ['更衣の準備をして着替えていただき、難しい部分は介助した。', '更衣介助を行い、本人ができる部分は見守った。'],
+  食事介助: ['食事の見守り・介助を行い、摂取状況を確認した。', '食事介助を実施し、水分摂取も促した。'],
+  見守り: ['本人の動作を見守り、必要な場面で声掛け・介助を行った。', '安全に配慮しながら見守りを行った。'],
+  汎用身体: [
+    '本人の体調を確認し、必要な身体介助を実施した。本人ができる動作は見守り、必要な場面で介助を行った。',
+    '訪問時に体調を確認し、本人のペースに合わせて身体介護を実施した。',
+    '本人へ声掛けを行い、状態を確認しながら必要な身体介助を実施した。安全に配慮して対応した。',
+  ],
+  汎用家事: [
+    '本人の生活状況を確認しながら必要な家事援助を実施した。',
+    '本人の希望を確認しながら必要な家事援助を行い、生活環境を整えた。',
+    '訪問時、体調と本日の支援内容を確認し、家事援助を実施した。',
+  ],
+  冒頭: [
+    '', '', '',
+    '訪問時、挨拶をして体調を伺った。',
+    '訪問時、本人の様子と本日の支援内容を確認した。',
+    '訪問時に声掛けを行い、顔色や表情を確認した。',
+    '訪問時、体調の確認を行った。',
+    '本日も予定通り訪問し、本人の様子を確認した。',
+    '訪問時、本人に挨拶し表情や顔色を確認した。',
+  ],
+  締め: [
+    '表情穏やかで、落ち着いて過ごされていた。',
+    '顔色良く、はっきりとした受け答えをされていた。',
+    '終始落ち着いた様子で、こちらの声掛けにも笑顔で応じられていた。',
+    '動作はしっかりしており、自分のペースで過ごされていた。',
+    'サービス中は会話も多く、笑顔が見られた。',
+    '本人の希望を確認しながら対応し、安全にサービスを終了した。',
+  ],
+};
+const SHORT = {
+  起床: ['起床の声掛け・介助を実施。', '起床介助・体調確認を行った。', '声掛けにて起床していただき、体調を確認。', '起床を促し、洗面までの移動を見守った。'],
+  服薬: ['服薬確認を行った。', '服薬の声掛け・確認を実施。', '服薬を確認し、飲み忘れなし。'],
+  服薬声掛け: ['服薬の声掛け・確認を実施。', '服薬を促し、服用を確認。'],
+  身支度: ['身支度を見守り、必要時介助した。', '洗面・更衣を促し見守った。'],
+  朝食: ['朝食準備等を行った。', '朝食準備・食後の片付けを実施。', '朝食を用意し、食後は食器を片付けた。', '本人の希望を聞き朝食を準備。台所を整えた。'],
+  昼食: ['昼食準備・片付けを実施。', '昼食を用意し、食後の片付けを行った。'],
+  夕食: ['夕食準備・片付けを実施。', '夕食を用意し、食後の片付けを行った。'],
+  調理: ['調理を行い、片付けまで実施。', '本人と相談してメニューを決め調理した。', '調理し、使用した器具を片付けた。'],
+  入浴: ['入浴介助を実施。洗身・洗髪を一部介助し、入浴後は水分補給を促した。', '入浴介助を実施。ふらつきなく、顔色良好。', '入浴前に体調確認。安全に配慮し入浴介助を行った。', '入浴介助。洗い残しがないよう声掛けし、入浴後は更衣を見守った。'],
+  入浴後片付け: ['入浴後の片付けを行った。', '入浴後の片付け・浴室清掃を実施。', '使用物品を片付け、浴室を整えた。'],
+  買い物: ['買い物代行を実施し、お釣りを確認していただいた。', '買い物代行。食料品・日用品を購入し本人と確認。', '希望の品を購入し、レシートとお釣りを渡した。'],
+  掃除: ['居室の掃除を実施。', '居室・台所の清掃を行った。', '本人と確認しながら掃除を実施。'],
+  洗濯: ['洗濯を実施。', '洗濯し、乾いた衣類を畳んだ。', '洗濯物を干し、衣類を整理した。'],
+  衣類整理: ['衣類整理を行った。', '衣類を整理し収納した。'],
+  共に: ['本人と共に行い、できる部分は見守った。', '本人と一緒に作業し、必要時のみ介助。'],
+  洗い物: ['調理後の洗い物を行った。', '食器を洗い台所を整えた。'],
+  就寝: ['就寝準備・服薬の声掛けを実施。', '就寝準備を行い、服薬を確認。', '寝室を整え、就寝前の声掛けを行った。'],
+  通院: ['通院介助を実施。', '通院に付き添い、移動を見守った。'],
+  排泄: ['排泄介助を実施。', '排泄の声掛け・介助を行った。'], 更衣: ['更衣介助を実施。', '更衣を見守り、必要時介助。'],
+  食事介助: ['食事介助を実施。', '食事の見守り・介助を行った。'], 見守り: ['見守りを行った。', '安全に配慮し見守った。'],
+  汎用身体: ['身体介護を実施。顔色良く、動作もしっかりされていた。', '体調確認の上、必要な身体介助を実施。'], 汎用家事: ['家事援助を実施。', '本人の希望を確認し家事援助を行った。'],
+  冒頭: ['', '', '訪問時、体調確認。', '訪問時、挨拶と体調確認を実施。', '訪問時、様子を確認。', '訪問時、声掛けし顔色・表情良好。'],
+  締め: ['顔色良好。', '表情穏やか。', '', '落ち着いて過ごされていた。', '受け答えはっきり。', '動作しっかり。'],
+};
+function kindOf(type) {
+  return /家事|生活/.test(type) && !/身体/.test(type) ? '家事援助' : '身体介護';
+}
+function tagsFor(e, kind) {
+  const all = (e.type || '') + '\n' + (e.detail || '');
+  const has = k => all.includes(k);
+  const tags = [];
+  if (has('起床')) tags.push('起床');
+  if (has('服薬')) tags.push(has('声掛け') || has('声かけ') ? '服薬声掛け' : '服薬');
+  if (has('起床') && !has('服薬')) tags.push('身支度');
+  if (has('朝食')) tags.push('朝食');
+  else if (has('昼食')) tags.push('昼食');
+  else if (has('夕食')) tags.push('夕食');
+  else if (has('調理')) tags.push('調理');
+  if (e.type === '入浴' || (has('入浴') && !has('入浴後'))) tags.push('入浴');
+  if (has('入浴後')) tags.push('入浴後片付け');
+  if (has('買い物')) tags.push('買い物');
+  if (has('掃除') || has('清掃')) tags.push('掃除');
+  if (has('洗濯')) tags.push('洗濯');
+  if (has('衣類整理')) tags.push('衣類整理');
+  if (has('洗い物')) tags.push('洗い物');
+  if (has('就寝')) tags.push('就寝');
+  if (has('通院')) tags.push('通院');
+  if (has('排泄')) tags.push('排泄');
+  if (has('更衣')) tags.push('更衣');
+  if (has('食事介助')) tags.push('食事介助');
+  if (has('共に') || has('一緒')) tags.push('共に');
+  if (!tags.length && has('見守り')) tags.push('見守り');
+  if (!tags.length) {
+    const h = parseInt(e.start || '12', 10);
+    if (kind === '身体介護' && h < 10) tags.push('起床', '身支度');
+    else if (kind === '身体介護' && h >= 18) tags.push('就寝');
+    else tags.push(kind === '身体介護' ? '汎用身体' : '汎用家事');
+  }
+  return [...new Set(tags)];
+}
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+function genText(row) {
+  const bank = document.querySelector('input[name=recStyle]:checked').value === 'short' ? SHORT : PB;
+  const tags = tagsFor(row.e, row.kind);
+  let t = pick(bank.冒頭) + tags.map(k => pick(bank[k] || PB[k] || [])).join('');
+  if (document.getElementById('recClosing').checked && !globStates.size && Math.random() < 0.35) t += pick(bank.締め);
+  return t;
+}
+function fmtKaipoke(d, e) {
+  const mm = String(d.getMonth() + 1).padStart(2, '0'), dd = String(d.getDate()).padStart(2, '0');
+  return `${mm} / ${dd} ${e.start || '--:--'} - ${e.end || '--:--'}`;
+}
+function buildRecords() {
+  const from = document.getElementById('recFrom').value, to = document.getElementById('recTo').value;
+  if (!from || !to) { alert('期間を入力してください'); return; }
+  if (!hasContent()) { alert('先に予定表を作成（または保存済み利用者を選択）してください'); return; }
+  const staff = document.getElementById('recStaff').value;
+  const includeNote = document.getElementById('recIncludeNote').checked;
+  recRows = [];
+  for (let d = new Date(from + 'T00:00:00'); d <= new Date(to + 'T00:00:00'); d.setDate(d.getDate() + 1)) {
+    const day = state.days[d.getDay()];
+    for (const e of dayEntries(day)) {
+      if (e.note && !includeNote) continue;
+      const kind = kindOf(e.type);
+      const row = { date: new Date(d), e: { ...e }, kind, staff, on: !e.note, flag: e.note || '' };
+      row.text = uniqueText(row, recRows);
+      recRows.push(row);
+    }
+  }
+  recRows.sort((a, b) => (b.date - a.date) || ((b.e.start || '') > (a.e.start || '') ? 1 : -1));
+  renderRecordView();
+}
+
+// ---- NG表現（含まれていたらアラーム。「NG表現を編集」で変更） ----
+const DEFAULT_NG = ['変化なし', '変化はな', '変化がな', '変わりな', 'お変わりな', '特変', '異常なし', '異常はな', '異常は見られ', 'いつも通り', 'いつもどおり', '特に問題な', '問題なし', '特記事項なし', '特になし'];
+function getNgList() { return getSetting('ng', 'smilewan_ng_list', DEFAULT_NG.slice()); }
+function editNgList() {
+  const v = prompt('記録に使いたくない表現を1行に1つずつ（部分一致でチェックします）', getNgList().join('\n'));
+  if (v === null) return;
+  setSetting('ng', 'smilewan_ng_list', v.split('\n').map(x => x.trim()).filter(Boolean));
+  if (recRows.length) renderRecordView();
+}
+function ngHits(text) { const t = text || ''; return getNgList().filter(w => t.includes(w)); }
+function ngRows() { return recRows.map((r, i) => r.on && ngHits(r.text).length ? i : -1).filter(i => i >= 0); }
+
+
+const FILLER_STATES = ['落ち着いている', '顔色良好', '笑顔・穏やか', '協力的', '歩行安定', '会話が多い', '元気', '感謝の言葉'];
+function sentences(t) { return (t || '').split('。').map(x => x.trim()).filter(Boolean); }
+function currentBank() { return document.querySelector('input[name=recStyle]:checked').value === 'short' ? SHORT : PB; }
+// 最低文数に満たない場合、同じ内容の別の言い回し・様子・締めの文を足す
+function ensureSentences(t, row) {
+  const min = +(document.getElementById('recMinSent').value || 2);
+  const bank = currentBank();
+  const tags = tagsFor(row.e, row.kind);
+  let guard = 0;
+  while (sentences(t).length < min && guard++ < 30) {
+    const have = new Set(sentences(t));
+    const pool = [];
+    tags.forEach(k => (bank[k] || PB[k] || []).forEach(v => pool.push({ v, where: 'end' })));
+    FILLER_STATES.forEach(k => pool.push({ v: statePhrase(k), where: 'end' }));
+    bank.締め.filter(Boolean).forEach(v => pool.push({ v, where: 'end' }));
+    const hasOpener = bank.冒頭.concat(PB.冒頭, SHORT.冒頭).some(v => v && t.startsWith(v));
+    if (!hasOpener) bank.冒頭.filter(Boolean).forEach(v => pool.push({ v, where: 'start' }));
+    const cand = pool.filter(c => c.v && !ngHits(c.v).length && !sentences(c.v).some(x => have.has(x)));
+    if (!cand.length) break;
+    const c = pick(cand);
+    t = c.where === 'start' ? c.v + t : t + c.v;
+  }
+  return t;
+}
+
+function composeText(row) { return ensureSentences(genText(row) + [...globStates].map(statePhrase).join(''), row); }
+function normText(t) { return (t || '').replace(/\s+/g, ''); }
+// 既存行と同じ文にならないよう最大12回まで作り直す
+function uniqueText(row, others) {
+  const used = new Set(others.map(r => normText(r.text)));
+  let t = composeText(row);
+  for (let k = 0; k < 20 && (used.has(normText(t)) || ngHits(t).length); k++) t = composeText(row);
+  if (used.has(normText(t))) {
+    const bank = document.querySelector('input[name=recStyle]:checked').value === 'short' ? SHORT : PB;
+    for (const c of [...bank.締め].sort(() => Math.random() - .5)) { if (c && !used.has(normText(t + c))) { t += c; break; } }
+  }
+  return t;
+}
+function dupGroups() {
+  const m = new Map();
+  recRows.forEach((r, i) => { if (!r.on) return; const k = normText(r.text); if (!k) return; if (!m.has(k)) m.set(k, []); m.get(k).push(i); });
+  return [...m.values()].filter(g => g.length > 1);
+}
+function renderRecordView() {
+  document.getElementById('statePop').style.display = 'none';
+  const v = document.getElementById('recordView');
+  if (!recRows.length) { v.innerHTML = '<div class="rec-empty">利用者と期間を選んで「記録を生成」を押してください</div>'; return; }
+  const n = recRows.filter(r => r.on).length;
+  const groups = dupGroups();
+  const dupIdx = new Map(); groups.forEach((g, gi) => g.forEach(i => dupIdx.set(i, gi + 1)));
+  const dupCount = dupIdx.size;
+  const ngIdx = new Set(ngRows());
+  v.innerHTML = (ngIdx.size ? `<div class="ng-alert">⚠ NG表現（「変化なし」「お変わりない」など）を含む行が ${ngIdx.size}行あります。橙色の行を「↻」で作り直すか、具体的な様子に書き換えてください。</div>` : '') + (groups.length ? `<div class="dup-alert">⚠ 同じ文章の行が ${groups.length}組（${dupCount}行）あります。赤い行の「↻」で言い換えるか、文章を編集してください。</div>` : '') + `<h2><span>訪問記録　${esc(state.name)} 様</span><small>${recRows.length}件中 ${n}件を出力　<a href="#" onclick="recRows.forEach(r=>r.on=true);renderRecordView();return false">全選択</a>／<a href="#" onclick="recRows.forEach(r=>r.on=false);renderRecordView();return false">全解除</a></small></h2>
+  <table class="rec-table"><tr><th class="chk"></th><th>日時</th><th>担当</th><th>種別</th><th>記録</th><th class="act"></th></tr>
+  ${recRows.map((r, i) => `<tr class="${r.on ? '' : 'off'} ${dupIdx.has(i) ? 'dup' : ''} ${ngIdx.has(i) ? 'ng' : ''}">
+    <td class="chk"><input type="checkbox" ${r.on ? 'checked' : ''} onchange="recRows[${i}].on=this.checked;renderRecordView()"></td>
+    <td class="dt">${String(r.date.getMonth() + 1).padStart(2, '0')} / ${String(r.date.getDate()).padStart(2, '0')}（${DAYS[r.date.getDay()]}）<br>
+      <input type="time" value="${esc(r.e.start)}" onchange="recRows[${i}].e.start=this.value"> - <input type="time" value="${esc(r.e.end)}" onchange="recRows[${i}].e.end=this.value">
+      ${r.flag ? `<span class="flag">${esc(r.flag)}</span>` : ''}</td>
+    <td class="staff"><select onchange="recRows[${i}].staff=this.value;recRows[${i}].staffEdited=true">${staffOptions(r.staff)}</select></td>
+    <td class="kind">${r.kind}<br><small style="color:var(--muted)">${esc(r.e.type)}${r.e.detail ? '<br>' + esc(r.e.detail).replace(/\n/g, '<br>') : ''}</small></td>
+    <td class="txt">${ngIdx.has(i) ? ngHits(r.text).map(w => `<span class="ng-badge">NG「${esc(w)}」</span>`).join('') : ''}${dupIdx.has(i) ? `<span class="dup-badge">⚠ 同じ文章（${dupIdx.get(i)}）</span>` : ''}<textarea oninput="recRows[${i}].text=this.value" onchange="renderRecordView()">${esc(r.text)}</textarea></td>
+    <td class="act"><button class="small" title="別の言い回し" onclick="recRows[${i}].text=uniqueText(recRows[${i}],recRows.filter((_,j)=>j!==${i}));renderRecordView()">↻</button>
+      <button class="small" title="文章をコピー" onclick="copyText(recRows[${i}].text,this)">📋</button><br>
+      <button class="small" title="感情・状態を選んで文に追加" style="margin-top:4px" onclick="openStatePop(${i},this)">😊様子</button></td>
+  </tr>`).join('')}</table>`;
+}
+
+
+// ---- 担当者リスト（「担当者を編集」で変更・ブラウザに保存） ----
+const DEFAULT_STAFF = ['安藤 大地', '谷口 勇人', '平岡 千明', '大垣 瑞穂', '大野 美香', '辻本 智子', '楠橋 ひとみ', '武井 幸恵', '金城 千夏', '宮本 侑宝', '稲垣 美々', '柳原 ほのか', '園田 夢弥'];
+function getStaffList() { const v = getSetting('staff', 'smilewan_staff_list', null); return (v && v.length) ? v : DEFAULT_STAFF.slice(); }
+function setStaffList(list, opt) { return setSetting('staff', 'smilewan_staff_list', list, opt); }
+function staffOptions(cur) {
+  const list = getStaffList();
+  const opts = list.map(n => `<option value="${esc(n)}" ${n === cur ? 'selected' : ''}>${esc(n)}</option>`);
+  if (cur && !list.includes(cur)) opts.unshift(`<option value="${esc(cur)}" selected>${esc(cur)}</option>`);
+  opts.unshift(`<option value="" ${!cur ? 'selected' : ''}>（未設定）</option>`);
+  return opts.join('');
+}
+function refreshStaffSelect() {
+  const sel = document.getElementById('recStaff');
+  let cur = sel.value; if (!cur) { try { cur = lsGet('smilewan_staff') || ''; } catch {} }
+  sel.innerHTML = staffOptions(cur);
+}
+function editStaffList() {
+  const cur = getStaffList().join('\n');
+  const v = prompt('担当者を1行に1人ずつ入力してください（並び順もこの通りになります）', cur);
+  if (v === null) return;
+  const list = v.split('\n').map(x => x.trim()).filter(Boolean);
+  if (!list.length) { alert('1人以上入力してください'); return; }
+  setStaffList(list); refreshStaffSelect(); if (recRows.length) renderRecordView();
+}
+
+// ---- 感情・状態の文例（チップ → 文末に追加） ----
+const STATES = {
+  '体調': {
+    '体調良好': ['体調は良好で、はっきりとした受け答えをされていた。', '本日は体調が良い様子で、自ら動かれる場面が多かった。', '体調を伺うと「大丈夫」とのことで、顔色も良好だった。'],
+    '落ち着いている': ['落ち着いた様子で、穏やかに過ごされていた。', '訪問時、落ち着いた表情で出迎えて下さった。', '終始落ち着いており、会話もはっきりされていた。'],
+    '顔色良好': ['顔色は良く、表情も明るかった。', '顔色良好で、声にも張りがあった。'],
+    '体調不良の訴え': ['「少し体がだるい」との訴えがあり、無理をしないよう声掛けを行った。', '体調がすぐれない様子で、休みながら過ごされるよう促した。'],
+    '倦怠感': ['途中、倦怠感の訴えがあったため、横になって休んでいただいた。', '倦怠感があるとのことで、こまめに休憩を挟みながら対応した。'],
+    'ふらつき': ['少しふらつきが見られたため、移動時は手を添えて見守った。', 'ふらつきがあったため、転倒に注意し声掛けと見守りを行った。'],
+    'のぼせ': ['入浴後、少しのぼせ気味だったため、椅子に座っていただき水分補給を促した。', 'のぼせ気味の様子があり、涼しい場所で休んでいただいた。'],
+    '痛みの訴え': ['痛みの訴えがあったため、無理のない範囲で動作を行うよう声掛けした。', '「痛みがある」とのことで、様子を確認し責任者へ報告することとした。'],
+    'めまい': ['めまいの訴えがあったため、座って休んでいただき様子を確認した。'],
+    '熱感・咳なし': ['熱感はなく、咳やくしゃみも見られなかった。', '額に触れても熱感はなく、呼吸も落ち着いていた。'],
+  },
+  '気分（良い）': {
+    '笑顔・穏やか': ['表情穏やかで、笑顔が見られた。', 'サービス中は笑顔で会話され、穏やかに過ごされていた。', '終始穏やかな表情で過ごされていた。'],
+    '元気': ['元気な様子で、自ら進んで行動されていた。', '本日は元気があり、よく話をされていた。', '声にも張りがあり、元気な様子だった。'],
+    '機嫌が良い': ['機嫌が良く、冗談を言って笑われる場面もあった。', 'ご機嫌な様子で、鼻歌を歌いながら過ごされていた。', '「今日は気分がいい」と話され、明るい表情だった。'],
+    '楽しそう': ['楽しそうに話をされ、表情も明るかった。', '好きな話題になると楽しそうに話されていた。'],
+    '嬉しそう': ['嬉しそうな表情で「ありがとう」と何度も言われていた。', '喜ばれている様子で、笑顔が多く見られた。'],
+    '安心した様子': ['話を聞くと安心された様子で、表情が和らいだ。', '声掛けを続けると落ち着きを取り戻し、安心した表情になられた。'],
+    'リラックス': ['リラックスした様子で、ゆったりと過ごされていた。', '緊張はなく、くつろいだ様子だった。'],
+    '意欲的': ['意欲的に取り組まれ、「自分でやってみる」と話されていた。', 'やる気が見られ、積極的に身の回りのことをされていた。'],
+    '感謝の言葉': ['「助かります」と感謝の言葉があった。', '帰り際に「また来てね」と笑顔で見送って下さった。'],
+    '前向きな発言': ['「明日は散歩に行こうかな」と前向きな発言があった。', '今後のことについて前向きに話されていた。'],
+  },
+  '気分（不調・不安）': {
+    '不安の訴え': ['「何となく不安に感じる」との訴えがあり、傾聴した。話されると少し和らいだ様子だった。', '不安な気持ちを話されたため、ゆっくりと傾聴し安心できるよう声掛けを行った。'],
+    '落ち込み': ['気分が沈んでいる様子で、無理に会話を促さず寄り添うよう対応した。', '元気がない様子だったため、傾聴を中心に対応した。'],
+    '寂しさの訴え': ['「一人は寂しい」との発言があり、傾聴した。', '寂しさを話されたため、話を聞きながらゆっくり対応した。'],
+    'イライラ': ['落ち着かない様子が見られたため、本人のペースを尊重して対応した。', 'イライラした様子があったが、しばらくすると落ち着かれた。'],
+    '怒り・拒否': ['声掛けに対して拒否的な反応があったため、時間を置いて再度声掛けした。', '一時的に怒った様子だったが、落ち着いてから対応を続けた。'],
+    '焦り': ['焦っている様子が見られたため、「ゆっくりで大丈夫」と声掛けした。'],
+    '緊張': ['少し緊張された様子で、口数が少なかった。', '緊張が見られたが、会話を続けるうちに和らいだ。'],
+    '心配ごと': ['心配ごとがあるとのことで、内容を伺い傾聴した。', '家族のことを心配されており、話を聞いた。'],
+    '混乱・戸惑い': ['予定を思い出せず戸惑う場面があったため、一緒に確認した。', '少し混乱された様子があり、ゆっくり説明して安心していただいた。'],
+    '涙': ['話の途中で涙を流される場面があり、寄り添って傾聴した。'],
+    '無気力': ['「何もする気になれない」と話され、無理のない範囲で声掛けした。', '意欲が低下している様子で、見守りを中心に対応した。'],
+    '気分の波': ['気分に波があり、途中で表情が変わる場面があった。'],
+  },
+  '態度・反応': {
+    '会話が多い': ['会話が多く、趣味の話などを沢山して下さった。', 'サービス中もよくお話をされ、明るい様子だった。'],
+    '会話が少ない': ['本日は口数が少なく、静かに過ごされていた。', 'あまり会話はなかったが、こちらの声掛けには応じられていた。'],
+    'ぼんやり': ['本日は少しぼんやりされているように見受けられた。', '反応がいつもより緩やかで、ぼんやりとした様子だった。'],
+    '協力的': ['協力的で、声掛けにスムーズに応じられていた。', 'こちらの提案に快く応じて下さった。'],
+    '甘え・依存': ['「やってほしい」との訴えが多く、できることは本人に促しながら対応した。'],
+    'こだわり': ['やり方にこだわりがあり、本人の希望に沿って対応した。'],
+    '疲れた様子': ['疲れた様子が見られたため、途中で休憩を挟んだ。', '「疲れた」と話されたため、横になって休んでいただいた。'],
+    '眠そう': ['眠そうな様子で、あくびが多かった。'],
+    '昔の話': ['昔の話を懐かしそうに話されていた。', '若い頃の話をされ、表情が明るくなった。'],
+    '冗談・ユーモア': ['冗談を交えながら会話され、笑い合う場面があった。'],
+  },
+  '食事・水分': {
+    '完食': ['食事は完食され、食欲は良好だった。', '用意した食事を美味しそうに完食されていた。'],
+    '食欲低下': ['食欲があまりない様子で、少量のみ召し上がられた。', '暑さのためか食欲が落ちている様子で、食べやすい物を勧めた。'],
+    '食事を残す': ['食事を半分ほど残されたため、体調を確認し様子を見ることとした。'],
+    '水分補給を促す': ['水分補給を促し、お茶を飲まれていた。', '脱水予防のため、こまめな水分摂取を声掛けした。'],
+    '水分摂取良好': ['水分はしっかり摂られていた。'],
+  },
+  '睡眠': {
+    'よく眠れた': ['「よく眠れた」とのことで、目覚めも良い様子だった。'],
+    '眠れなかった': ['昨夜はあまり眠れなかったとのことで、日中に休むよう声掛けした。', '「何度も目が覚めた」と話され、少し疲れた様子だった。'],
+    '目覚めが悪い': ['本日は目覚めが悪く、起床に時間がかかった。', '目覚めが悪くなかなか起きられなかったため、ゆっくり声掛けを続けた。'],
+    '訪問時就寝中': ['訪問時はまだ就寝中だったため、声掛けにて起床していただいた。'],
+  },
+  '排泄・皮膚': {
+    '排泄良好': ['排泄は自立しており、本人から「便も出ている」と話があった。', 'トイレへは自分で行かれ、排泄も順調とのことだった。'],
+    '便秘の訴え': ['便秘気味との訴えがあり、水分摂取を促した。'],
+    '皮膚きれい': ['皮膚は発赤や傷もなく、きれいな状態だった。', '皮膚の状態は良好で、乾燥や発赤は見られなかった。'],
+    '発赤・かゆみ': ['皮膚に発赤が見られたため、様子を見る必要がある。責任者へ報告する。', 'かゆみの訴えがあり、掻き壊しがないか確認した。'],
+  },
+  '動作・服薬': {
+    '動作ゆっくり': ['動作がいつもよりゆっくりに感じられたため、急がせず本人のペースで進めた。'],
+    '自ら行動': ['自ら進んで身支度をされ、できることは本人が行われていた。'],
+    '歩行安定': ['歩行は安定しており、移動時のふらつきは見られなかった。', '足取りはしっかりしており、手すりを使って安全に移動されていた。'],
+    '服薬済み確認': ['服薬済みであることを確認した。'],
+    '飲み忘れあり': ['薬の飲み忘れがあったため、声掛けして服用していただいた。', '服薬の時間がいつもより遅くなったとのことだった。'],
+  },
+  'その他': {
+    '家族来訪': ['ご家族が来訪されており、様子を共有した。'],
+    '外出予定': ['この後外出予定があるとのことで、身支度を整えた。'],
+    '初回訪問': ['初回訪問のため、支援内容を確認しながら対応した。少し緊張された様子だった。'],
+    '責任者に報告': ['気になる点があったため、責任者へ報告することとした。'],
+    '本人の希望あり': ['本人からの希望を確認し、可能な範囲で対応した。'],
+  },
+};
+const globStates = new Set();
+(function initGlobStates() {
+  const el = document.getElementById('globStates');
+  el.innerHTML = Object.values(STATES).flatMap(g => Object.keys(g)).map(k => `<span class="chip" data-k="${esc(k)}">${esc(k)}</span>`).join('');
+  el.querySelectorAll('.chip').forEach(c => c.onclick = () => { const k = c.dataset.k; if (globStates.has(k)) globStates.delete(k); else globStates.add(k); c.classList.toggle('on', globStates.has(k)); });
+})();
+function statePhrase(k) { for (const g of Object.values(STATES)) if (g[k]) return pick(g[k]); return ''; }
+function appendState(i, k) {
+  const r = recRows[i]; const t = statePhrase(k);
+  r.text = (r.text || '').replace(/\s+$/, '') + t;
+  const ta = document.querySelector(`#recordView tr:nth-child(${i + 2}) td.txt textarea`);
+  if (ta) { ta.value = r.text; ta.style.borderColor = 'var(--accent)'; setTimeout(() => ta.style.borderColor = '', 600); }
+}
+let popRow = -1;
+function openStatePop(i, btn) {
+  const pop = document.getElementById('statePop');
+  if (pop.style.display === 'block' && popRow === i) { pop.style.display = 'none'; return; }
+  popRow = i;
+  pop.innerHTML = `<div class="head"><b>様子を選ぶ（クリックで文末に追加）</b><button class="small" onclick="document.getElementById('statePop').style.display='none'">閉じる</button></div>` +
+    Object.entries(STATES).map(([cat, g]) => `<div class="cat">${cat}</div><div class="chips">${Object.keys(g).map(k => `<span class="chip" onclick="appendState(${i},'${k}')">${k}</span>`).join('')}</div>`).join('');
+  const rect = btn.getBoundingClientRect();
+  pop.style.display = 'block';
+  pop.style.left = Math.max(8, Math.min(window.scrollX + rect.left - 470, window.innerWidth - 480)) + 'px';
+  pop.style.top = (window.scrollY + rect.bottom + 4) + 'px';
+}
+document.addEventListener('click', ev => {
+  const pop = document.getElementById('statePop');
+  if (pop.style.display === 'block' && !pop.contains(ev.target) && !ev.target.closest('td.act')) pop.style.display = 'none';
+});
+
+function copyText(t, btn) {
+  navigator.clipboard.writeText(t).then(() => { if (btn) { const o = btn.textContent; btn.textContent = '✓'; setTimeout(() => btn.textContent = o, 900); } });
+}
+function dupConfirm() {
+  const g = dupGroups(), ng = ngRows();
+  const msgs = [];
+  if (ng.length) msgs.push(`NG表現を含む行が ${ng.length}行あります。`);
+  if (g.length) msgs.push(`同じ文章の行が ${g.length}組あります。`);
+  return !msgs.length || confirm('⚠ ' + msgs.join('\n') + '\nこのまま出力しますか？（キャンセルで戻って修正）');
+}
+function copyRecordsTsv() {
+  const rows = recRows.filter(r => r.on);
+  if (!rows.length) { alert('出力する行がありません'); return; }
+  if (!dupConfirm()) return;
+  const tsv = ['日時\t担当\t種別\t記録', ...rows.map(r => [fmtKaipoke(r.date, r.e), r.staff, r.kind, r.text.replace(/\t|\n/g, ' ')].join('\t'))].join('\n');
+  copyText(tsv); alert(`${rows.length}件をコピーしました（Excelに貼り付けできます）`);
+}
+async function exportRecordsXlsx() {
+  const rows = recRows.filter(r => r.on);
+  if (!rows.length) { alert('出力する行がありません'); return; }
+  if (!dupConfirm()) return;
+  const name = (state.name || '').trim();
+  const aoa = [];
+  rows.forEach(r => { aoa.push([fmtKaipoke(r.date, r.e)]); aoa.push([r.staff]); aoa.push([r.kind, '', r.text]); aoa.push([]); });
+  try { await loadLib('xlsx'); } catch {}
+  if (window.XLSX) {
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [{ wch: 22 }, { wch: 9 }, { wch: 100 }];
+    XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31) || '訪問記録');
+    const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    download(new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `訪問記録_${name}_${document.getElementById('recFrom').value}.xlsx`);
+  } else {
+    const csv = '﻿' + aoa.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    download(new Blob([csv], { type: 'text/csv' }), `訪問記録_${name}.csv`);
+  }
+}
+
+// ---- PDF保存（A4縦。行の途中でページが切れないよう、1ページずつ組んで画像化→PDF） ----
+async function exportRecordsPdf() {
+  const rows = recRows.filter(r => r.on);
+  if (!rows.length) { alert('出力する行がありません'); return; }
+  if (!dupConfirm()) return;
+  try { await loadLib('pdfOut'); } catch {}
+  if (!window.html2canvas || !window.jspdf) { alert('PDF作成の部品を読み込めませんでした。通信状態を確認して再読み込みしてください'); return; }
+  const btn = document.getElementById('pdfBtn'), label = btn.textContent;
+  btn.disabled = true; btn.textContent = 'PDF作成中…';
+  const W = 794, H = 1123, PAD = 45; // A4 @96dpi
+  const name = (state.name || '').trim();
+  const from = document.getElementById('recFrom').value, to = document.getElementById('recTo').value;
+  const period = `${from.replace(/-/g, '/')} 〜 ${to.replace(/-/g, '/')}`;
+  const host = document.createElement('div');
+  host.style.cssText = 'position:fixed;left:-10000px;top:0;';
+  document.body.appendChild(host);
+  const cell = 'border:1px solid #555;padding:5px 7px;vertical-align:top;text-align:left;';
+  const head = `<tr style="background:#eee;font-weight:bold"><td style="${cell}width:112px">日時</td><td style="${cell}width:76px">担当</td><td style="${cell}width:76px">種別</td><td style="${cell}">記録</td></tr>`;
+  const rowHtml = r => `<tr><td style="${cell}white-space:nowrap">${String(r.date.getMonth() + 1).padStart(2, '0')}/${String(r.date.getDate()).padStart(2, '0')}（${DAYS[r.date.getDay()]}）<br>${esc(r.e.start || '--:--')} - ${esc(r.e.end || '--:--')}</td><td style="${cell}">${esc(r.staff)}</td><td style="${cell}">${esc(r.kind)}</td><td style="${cell}line-height:1.55;white-space:pre-wrap">${esc(r.text)}</td></tr>`;
+  const newPage = () => {
+    const pg = document.createElement('div');
+    pg.style.cssText = `width:${W}px;height:${H}px;padding:${PAD}px;box-sizing:border-box;background:#fff;color:#000;font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic","Meiryo",sans-serif;font-size:13px;position:relative;`;
+    pg.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:10px"><div style="font-size:20px;font-weight:bold">訪問記録　${esc(name)} 様</div><div style="font-size:12px">期間：${period}</div></div><table style="width:100%;border-collapse:collapse;table-layout:fixed">${head}</table><div class="pf" style="position:absolute;left:${PAD}px;right:${PAD}px;bottom:22px;display:flex;justify-content:space-between;font-size:11px;color:#333"><span>訪問介護 すまいるわん　TEL 080-4135-4037</span><span class="pn"></span></div>`;
+    host.appendChild(pg); return pg;
+  };
+  try {
+    const pages = [];
+    let pg = newPage(); pages.push(pg);
+    const limit = H - PAD - 30; // フッター分を残す
+    for (const r of rows) {
+      let tb = pg.querySelector('tbody') || pg.querySelector('table');
+      tb.insertAdjacentHTML('beforeend', rowHtml(r));
+      const table = pg.querySelector('table');
+      if (table.offsetTop + table.offsetHeight > limit && table.rows.length > 2) {
+        table.rows[table.rows.length - 1].remove();
+        pg = newPage(); pages.push(pg);
+        (pg.querySelector('tbody') || pg.querySelector('table')).insertAdjacentHTML('beforeend', rowHtml(r));
+      }
+    }
+    pages.forEach((p, i) => { p.querySelector('.pn').textContent = `${i + 1} / ${pages.length}`; });
+    const pdf = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+    for (let i = 0; i < pages.length; i++) {
+      const canvas = await html2canvas(pages[i], { scale: 1.6, backgroundColor: '#ffffff', logging: false });
+      if (i) pdf.addPage();
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.85), 'JPEG', 0, 0, 210, 297);
+    }
+    await download(pdf.output('blob'), `訪問記録_${name}_${from}〜${to}.pdf`);
+  } catch (e) {
+    alert('PDFを作成できませんでした: ' + (e && e.message || e));
+  } finally {
+    host.remove(); btn.disabled = false; btn.textContent = label;
+  }
+}
+
+// ---- 紙(PDF)から取込: スキャンした週間予定表を、ブラウザ内の文字読み取り(Tesseract)で予定表に入れる ----
+// ログイン・費用なし。表の縦線で曜日の列を切り分け、列ごとに読み取って「種別／時間／内容」に振り分ける
+let ocrWorker = null;
+function paperMsg(t) {
+  ['paperStatus', 'paperStatus2'].forEach(id => { const el = document.getElementById(id); if (el) { el.style.display = t ? '' : 'none'; el.textContent = t || ''; } });
+}
+// 公開版はページからのダウンロード(fetch)やブラウザ保存が制限されることがあるため、
+// Tesseract の本体(wasm)だけ Worker の importScripts で読み込み、日本語データは同梱の ocr-jpn.js から直接渡す
+const OCR_CORE = 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1/tesseract-core-lstm.wasm.js';
+const OCR_WORKER_SRC = `
+importScripts('${OCR_CORE}');
+let M = null, api = null;
+onmessage = async (e) => {
+  const { id, cmd, data } = e.data;
+  try {
+    if (cmd === 'init') {
+      M = await TesseractCore({ TesseractProgress() {} });
+      M.FS.writeFile('/jpn.traineddata', data);
+      api = new M.TessBaseAPI();
+      if (api.Init(null, 'jpn') !== 0) throw new Error('初期化に失敗しました');
+      postMessage({ id, ok: true });
+    } else if (cmd === 'recognize') {
+      M.FS.writeFile('/input', data);
+      if (api.SetImageFile(1, 0) === 1) throw new Error('画像を読めませんでした');
+      api.Recognize(null);
+      postMessage({ id, ok: true, tsv: api.GetTSVText(0) });
+    }
+  } catch (err) { postMessage({ id, ok: false, error: String((err && err.message) || err) }); }
+};`;
+function ocrClient(worker) {
+  let seq = 0; const wait = new Map();
+  worker.onmessage = e => { const w = wait.get(e.data.id); if (!w) return; wait.delete(e.data.id); e.data.ok ? w.ok(e.data) : w.ng(new Error(e.data.error)); };
+  worker.onerror = e => { const err = new Error('読み取り部品のエラー: ' + (e.message || '不明')); wait.forEach(w => w.ng(err)); wait.clear(); };
+  const call = (cmd, data, transfer, ms) => new Promise((ok, ng) => {
+    const id = ++seq; wait.set(id, { ok, ng });
+    setTimeout(() => { if (wait.delete(id)) ng(new Error('文字読み取りに時間がかかりすぎました')); }, ms);
+    worker.postMessage({ id, cmd, data }, transfer || []);
+  });
+  return {
+    init: data => call('init', data, [data.buffer], 120000),
+    // canvas → 行ごとの文字と位置（TSV の level 5 = 単語 を行ごとにまとめる）
+    async recognize(canvas) {
+      const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+      const buf = new Uint8Array(await blob.arrayBuffer());
+      const { tsv } = await call('recognize', buf, [buf.buffer], 120000);
+      const lines = new Map();
+      String(tsv || '').split('\n').forEach(row => {
+        const c = row.split('\t'); if (c.length < 12 || c[0] !== '5') return;
+        const key = c[2] + '-' + c[3] + '-' + c[4], top = +c[7], txt = c[11] || '';
+        const l = lines.get(key) || { y: top, t: '' }; l.y = Math.min(l.y, top); l.t += txt; lines.set(key, l);
+      });
+      return [...lines.values()];
+    },
+  };
+}
+async function getOcr() {
+  if (ocrWorker) return ocrWorker;
+  await loadScriptOnce(new URL('ocr-jpn.js', location.href).href);
+  const bin = atob(window.OCR_JPN_B64), buf = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  let w;
+  try { w = new Worker(URL.createObjectURL(new Blob([OCR_WORKER_SRC], { type: 'text/javascript' }))); }
+  catch (e) { throw new Error('このブラウザでは文字読み取りを起動できません（' + ((e && e.message) || e) + '）'); }
+  const client = ocrClient(w);
+  await client.init(buf);
+  ocrWorker = client;
+  return ocrWorker;
+}
+// PDF 1ページ目（または画像）を 300dpi 相当のキャンバスに
+async function paperCanvas(file) {
+  if (file.type.startsWith('image/')) {
+    const img = await createImageBitmap(file);
+    const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+    const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(img, 0, 0); return c;
+  }
+  await loadLib('pdfIn');
+  if (!window.pdfjsLib) throw new Error('PDF読み込みの部品を読み込めませんでした');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; // pdf.worker を読込済みなら画面内で処理（Worker不要）
+  const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+  const page = await pdf.getPage(1);
+  const v1 = page.getViewport({ scale: 1 });
+  const vp = page.getViewport({ scale: Math.min(300 / 72, 3600 / Math.max(v1.width, v1.height)) });
+  const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height;
+  const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+  await page.render({ canvasContext: x, viewport: vp }).promise;
+  return c;
+}
+function rotateCanvas(src, deg) {
+  if (!deg) return src;
+  const c = document.createElement('canvas');
+  if (deg === 180) { c.width = src.width; c.height = src.height; } else { c.width = src.height; c.height = src.width; }
+  const x = c.getContext('2d'); x.translate(c.width / 2, c.height / 2); x.rotate(deg * Math.PI / 180); x.drawImage(src, -src.width / 2, -src.height / 2);
+  return c;
+}
+// 罫線を探す: 縦線8本（7列）と、表の幅いっぱいの横線
+function findGrid(c) {
+  const W = c.width, H = c.height, d = c.getContext('2d').getImageData(0, 0, W, H).data;
+  const dark = (x, y) => { const i = (y * W + x) * 4; return d[i] + d[i + 1] + d[i + 2] < 380; };
+  const runs = (arr, th) => { const out = []; let s = -1; for (let i = 0; i <= arr.length; i++) { if (i < arr.length && arr[i] > th) { if (s < 0) s = i; } else if (s >= 0) { out.push(Math.round((s + i - 1) / 2)); s = -1; } } return out; };
+  const colP = new Array(W).fill(0); for (let x = 0; x < W; x++) { let n = 0; for (let y = 0; y < H; y += 2) if (dark(x, y)) n++; colP[x] = n; }
+  const vmax = Math.max(...colP); if (vmax < H / 2 * 0.15) return null;
+  let V = runs(colP, vmax * 0.6);
+  if (V.length < 8) return null;
+  // 等間隔に近い連続8本を選ぶ
+  let best = null;
+  for (let i = 0; i + 7 < V.length; i++) {
+    const g = V.slice(i, i + 8), w = g.slice(1).map((v, j) => v - g[j]), avg = (g[7] - g[0]) / 7;
+    const err = Math.max(...w.map(v => Math.abs(v - avg))) / avg;
+    if (err < 0.25 && (!best || err < best.err)) best = { g, err };
+  }
+  if (!best) return null; V = best.g;
+  // 横線: 少し傾いたスキャンでも拾えるよう、上下3pxの幅で「どこかに黒がある」列の割合を数える
+  const xs = []; for (let x = V[0]; x < V[7]; x += 2) xs.push(x);
+  const rowBits = []; for (let y = 0; y < H; y++) { const b = new Uint8Array(xs.length); xs.forEach((x, i) => { if (dark(x, y)) b[i] = 1; }); rowBits.push(b); }
+  const rowP = new Array(H).fill(0);
+  for (let y = 3; y < H - 3; y++) { let n = 0; for (let i = 0; i < xs.length; i++) { for (let k = -3; k <= 3; k++) if (rowBits[y + k][i]) { n++; break; } } rowP[y] = n; }
+  const Hs = runs(rowP, (V[7] - V[0]) / 2 * 0.85);
+  if (Hs.length < 3) return null;
+  return { V, Hs, dark, W, H };
+}
+async function ocrLines(worker, canvas, sx, sy, sw, sh, S = 2, erase = []) {
+  const c = document.createElement('canvas'); c.width = Math.round(sw * S); c.height = Math.round(sh * S);
+  const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+  x.drawImage(canvas, sx, sy, sw, sh, 0, 0, c.width, c.height);
+  x.fillStyle = '#fff'; erase.forEach(y => x.fillRect(0, (y - sy - 5) * S, c.width, 11 * S));
+  // 白黒にする（黄色マーカーや薄いグレーの背景を消す）
+  const im = x.getImageData(0, 0, c.width, c.height), p = im.data;
+  for (let i = 0; i < p.length; i += 4) { const v = (p[i] * 0.3 + p[i + 1] * 0.59 + p[i + 2] * 0.11) < 150 ? 0 : 255; p[i] = p[i + 1] = p[i + 2] = v; }
+  x.putImageData(im, 0, 0);
+  const lines = await worker.recognize(c);
+  return lines.map(l => ({ y: l.y / S + sy, t: l.t.replace(/\s+/g, '') })).filter(l => l.t).sort((a, b) => a.y - b.y);
+}
+// 読み取り文字の揺れを直す
+const OCR_FIX = [[/人浴/g, '入浴'], [/排池|排世/g, '排泄'], [/楽/g, '薬'], [/尿寝|就痕|就寝/g, '就寝'], [/[|｜_]/g, ''], [/^[ー一\-－~〜・.,:;]+/, ''], [/[ー一\-－~〜]+$/, '']];
+function ocrClean(t) { OCR_FIX.forEach(([a, b]) => { t = t.replace(a, b); }); return t.trim(); }
+function ocrTime(t) {
+  const s = t.replace(/[OoＯ]/g, '0').replace(/[lIｌ|]/g, '1');
+  // 訪問介護で 0〜5時台はまず無いので、先頭の「1」の読み落とし（11:30→1:30）とみなして +10時間
+  const hh = (h, mm) => { h = +h; if (h <= 5) h += 10; return (h <= 24 && +mm < 60) ? `${String(h).padStart(2, '0')}:${mm}` : ''; };
+  const m = s.match(/(\d{1,2})\D{0,2}(\d{2})\D{0,4}?(\d{1,2})\D{0,2}(\d{2})/);
+  if (m) {
+    let start = hh(m[1], m[2]); const end = hh(m[3], m[4]);
+    // 開始の先頭「1」の読み落とし（17:30→7:30）: 10時間足すと自然な長さ(4時間以内)になるなら直す
+    const min = t => t ? +t.slice(0, 2) * 60 + +t.slice(3) : 0;
+    if (start && end && (min(end) < min(start) || min(end) - min(start) > 240) && min(start) + 600 < min(end) && min(end) - min(start) - 600 <= 240) start = `${+start.slice(0, 2) + 10}:${start.slice(3)}`;
+    return { start, end };
+  }
+  // 終わりの時刻が読めなかった行（例「11:00草:30」）: 開始だけ使う（終了は次の予定の開始から補う）
+  const one = s.match(/^\D{0,2}(\d{1,2}):(\d{2})\D{1,4}\d{0,2}:?\d{0,2}$/);
+  if (one) return { start: hh(one[1], one[2]), end: '' };
+  return null;
+}
+function ocrType(t) {
+  if (t.length > 5 || /全身|整容|介助|準備|確認|提供/.test(t)) return '';
+  if (/通院/.test(t)) return '通院介助';
+  if (/浴/.test(t)) return '入浴';
+  if (/生活/.test(t)) return '生活援助';
+  if (/身|体/.test(t) && /家|事/.test(t)) return '身体・家事';
+  if (/身|体/.test(t)) return '身体';
+  if (/家|事/.test(t)) return '家事';
+  return '';
+}
+const OCR_PHRASES = [...new Set([...DETAIL_PRESETS, '起床介助等', '服薬介助', '朝食準備', '昼食準備', '夕食準備', '調理・代行・掃除', '調理・洗濯・掃除', '共に行う片付け', '就寝準備・服薬', '買い物代行', '通院介助', '洗濯', '入浴介助'])];
+function bigrams(s) { const a = []; for (let i = 0; i < s.length - 1; i++) a.push(s.slice(i, i + 2)); return a; }
+function similar(a, b) { const x = bigrams(a), y = bigrams(b); if (!x.length || !y.length) return a === b ? 1 : 0; let n = 0; const yy = [...y]; x.forEach(g => { const k = yy.indexOf(g); if (k >= 0) { n++; yy.splice(k, 1); } }); return 2 * n / (x.length + y.length); }
+function ocrPhrase(t) { let best = t, sc = 0; OCR_PHRASES.forEach(p => { const s = similar(t, p); if (s > sc) { sc = s; best = p; } }); return sc >= 0.6 ? best : t; }
+function guessType(detail, start) {
+  if (/通院/.test(detail)) return '通院介助';
+  if (/共に|一緒|起床|服薬|薬|就寝|排泄|更衣|食事介助/.test(detail)) return '身体';
+  if (/入浴/.test(detail) && !/片付|後/.test(detail)) return '入浴';
+  if (/調理|掃除|洗濯|代行|買い物|準備|片付/.test(detail)) return '家事';
+  return '身体';
+}
+// 1列分の行 → 予定のリスト（種別→時間→内容 の並び）
+function parseColumn(lines, exact = false) {
+  const list = []; let pending = '', pendingDetail = '', pendingY = 0, lastY = 0, cur = null;
+  const L = lines.map(({ y, t }) => ({ y, t: exact ? String(t).replace(/\s+/g, ' ').trim() : ocrClean(t) })).filter(l => l.t && !/^時間$|^時問$/.test(l.t));
+  L.forEach(({ y, t }, i) => {
+    const tm = ocrTime(t);
+    if (tm) { cur = { type: pending, start: tm.start, end: tm.end, detail: pendingDetail ? [pendingDetail] : [], note: '', y }; list.push(cur); pending = ''; pendingDetail = ''; lastY = y; return; }
+    // Excel は「時間のすぐ上の行＝種別」。「身体1生活1」「入浴（身体2）」などはそのまま種別に、
+    // 「掃除・洗濯・買い物」のような内容は種別を推測して内容に入れる
+    if (exact && L[i + 1] && ocrTime(L[i + 1].t)) {
+      if (ocrType(t)) pending = ocrType(t);
+      else if (/身体|生活|家事|入浴|通院/.test(t) && t.length <= 12) pending = t;
+      else { pending = guessType(t); pendingDetail = t; }
+      return;
+    }
+    const ty = exact ? (SERVICE_TYPES.includes(t) ? t : '') : ocrType(t);
+    if (ty) { pending = ty; pendingY = y; return; }
+    if (t.length < 2) return;
+    // 「入浴」の直後に時間ではなく内容が続く → 「入浴」は種別ではなく内容の一部（例: 入浴／眠前薬の準備）
+    // （Excel で前の予定から3行以上離れていれば、別の予定の種別として扱う）
+    const apart = exact && pending && pendingY - lastY >= 3;
+    if (pending && cur && cur.start && !cur.detail.length && !apart) { cur.detail.push(pending); pending = ''; }
+    if (!cur || (pending && (cur.detail.length || apart))) { cur = { type: pending, start: '', end: '', detail: [], note: '', y }; list.push(cur); pending = ''; }
+    if (/月\d?回|月[1-9１-９]|週に|隔週|のみ/.test(t)) cur.note = t; else cur.detail.push(exact ? t : ocrPhrase(t));
+    lastY = y;
+  });
+  if (pending) {
+    if (cur && cur.start && !cur.detail.length && !(exact && pendingY - lastY >= 3)) cur.detail.push(pending);
+    else list.push({ type: pending, start: '', end: '', detail: [], note: '', y: L.length ? L[L.length - 1].y : 0 });
+  }
+  list.forEach((e, i) => {
+    const nx = list[i + 1];
+    // 終了時刻が読めなかったものは、次の予定の開始時刻で補う
+    if (e.start && !e.end && nx && nx.start > e.start) e.end = nx.start;
+    // 「身体 7:00／家事 7:30／起床介助等／朝食準備等」のように内容がまとめて後ろに書かれている → 1つ目を前の予定へ
+    if (e.start && !e.detail.length && !e.note && nx && nx.start && nx.detail.length >= 2) e.detail.push(nx.detail.shift());
+  });
+  return list.map(e => ({ ...e, detail: e.detail.join('\n'), type: e.type || guessType(e.detail.join(''), e.start) }));
+}
+async function readSchedulePaper(file) {
+  paperMsg('📄 PDFを画像に変換中…');
+  const base = await paperCanvas(file);
+  // 向き: 横長の表なので、縦長ページなら90°回転。どちらの90°かは曜日の見出しで判定
+  const tries = base.height > base.width ? [90, 270, 0, 180] : [0, 180, 90, 270];
+  paperMsg('📄 文字読み取りの準備中…（初回は20秒ほどかかります）');
+  const worker = await getOcr();
+  let pick = null;
+  for (const deg of tries) {
+    const c = rotateCanvas(base, deg), g = findGrid(c);
+    if (!g) continue;
+    const hdr = await ocrLines(worker, c, g.V[0], g.Hs[0], g.V[7] - g.V[0], g.Hs[1] - g.Hs[0], 1);
+    const score = [...'日月火水木金土'].filter(ch => hdr.map(l => l.t).join('').includes(ch)).length;
+    if (!pick || score > pick.score) pick = { c, g, score };
+    if (score >= 4) break;
+  }
+  if (!pick) throw new Error('表の枠線を見つけられませんでした。スキャナーでまっすぐ読み込んだPDFを使ってください');
+  const { c, g } = pick, V = g.V, Hs = g.Hs;
+  // 見出し(曜日)・時間の行の下から読み取る。上段/下段の境目は幅いっぱいの横線
+  const top = Hs.length >= 4 ? Hs[2] : Hs[1], bottom = Hs[Hs.length - 1];
+  // 利用者名（表の上のタイトル）
+  paperMsg('📄 利用者名を読み取り中…');
+  const title = Hs[0] > 20 ? (await ocrLines(worker, c, 0, 0, c.width, Hs[0], 1)).map(l => l.t).join('') : '';
+  // 「週間予定表(○○様)」の○○。カッコや「様」が崩れて読まれても拾えるように
+  const raw = (title.split(/予定表|定表/).pop() || title).split(/様|㏌|襟|桜/)[0].replace(/[()（）「」\[\]{}|｜_・.,:;'"`~ー\-]/g, '').trim();
+  const { name, readName, matched } = matchUserName(raw);
+  const days = DAYS.map(emptyDay);
+  let count = 0;
+  for (let k = 0; k < 7; k++) {
+    paperMsg(`📄 ${DAYS[k]}曜日を読み取り中…（${k + 1}/7）`);
+    const x0 = V[k] + 6, x1 = V[k + 1] - 6;
+    // 列の中の横線（セルの区切り）は消してから読む
+    // 列の中の横線（少し傾いていても拾えるよう上下3pxの幅で判定）
+    const hl = []; for (let y = top + 6; y < bottom - 6; y++) { let n = 0, m = 0; for (let x = x0; x < x1; x += 2) { m++; for (let k = -3; k <= 3; k++) if (g.dark(x, y + k)) { n++; break; } } if (n > m * 0.85 && (!hl.length || y - hl[hl.length - 1] > 12)) hl.push(y); }
+    // 段の境目: 1本目=上段/中段、2本目=中段/下段（線が1本だけの2段の用紙は 上段/下段）
+    const b1 = hl.find(y => y > top + 20), b2 = hl.find(y => y > (b1 || 0) + 20 && y < bottom - 20);
+    const blockOf = y => !b1 || y < b1 - 4 ? 'upper' : (!b2 ? 'lower' : (y < b2 - 4 ? 'middle' : 'lower'));
+    const lines = await ocrLines(worker, c, x0, top + 2, x1 - x0, bottom - top - 2, 2, [top, ...hl]);
+    parseColumn(lines).forEach(e => {
+      days[k][blockOf(e.y)].push({ ...emptyEntry(), type: e.type, start: e.start, end: e.end, detail: e.detail, note: e.note });
+      count++;
+    });
+  }
+  return { name, readName, matched, days, count };
+}
+// 読み取った名前を、登録済みの利用者（利用者CSV・保存済み予定表）の中で一番近い名前に合わせる
+function matchUserName(raw) {
+  const read = String(raw || '').replace(/\s/g, '');
+  if (!read) return { name: '', readName: '', matched: '' };
+  const cands = [...new Set([...getUserMaster().map(u => u.name), ...Object.keys(getStore())])];
+  const flat = n => n.replace(/\s/g, '');
+  const exact = cands.find(n => flat(n) === read);
+  if (exact) return { name: exact, readName: read, matched: 'exact' };
+  // 文字の一致度（同じ文字がいくつ含まれるか＋2文字の並び）で比べる
+  const score = n => { const a = [...flat(n)], b = [...read]; const bb = [...b]; let hit = 0; a.forEach(ch => { const k = bb.indexOf(ch); if (k >= 0) { hit++; bb.splice(k, 1); } }); return (2 * hit / (a.length + b.length)) * 0.6 + similar(flat(n), read) * 0.4; };
+  let best = '', sc = 0, second = 0;
+  cands.forEach(n => { const v = score(n); if (v > sc) { second = sc; sc = v; best = n; } else if (v > second) second = v; });
+  if (best && sc >= 0.45 && sc - second >= 0.1) return { name: best, readName: read, matched: 'fuzzy' };
+  return { name: read, readName: read, matched: '' };
+}
+// ---- Excel（すまいるわん週間予定表.xlsx：利用者ごとに1シート）から一括取込 ----
+// 各シート: 1行目「週間予定表（ 氏名 様）」、曜日の見出し行（日〜土）、「時間」行の下に 種別／時間／内容 が縦に並ぶ
+function blockByTime(start) {
+  if (!start) return 'upper';
+  const h = +start.slice(0, 2);
+  return h < 12 ? 'upper' : h < 17 ? 'middle' : 'lower';
+}
+function parseScheduleSheet(ws, sheetName) {
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: true, defval: '' });
+  // 曜日の見出し行と列
+  let hr = -1, cols = null;
+  for (let r = 0; r < rows.length && hr < 0; r++) {
+    const found = DAYS.map(d => rows[r].findIndex(v => String(v).trim() === d));
+    if (found.filter(c => c >= 0).length >= 6) { hr = r; cols = found; }
+  }
+  if (hr < 0) return null;
+  const titleCell = rows.slice(0, hr).flat().map(String).find(v => /様/.test(v)) || '';
+  const m = titleCell.replace(/\s+/g, ' ').match(/[（(]\s*(.+?)\s*様/);
+  const name = (m ? m[1] : String(sheetName)).replace(/[\s　]+/g, ' ').trim();
+  const days = DAYS.map(emptyDay); let count = 0;
+  cols.forEach((c, dow) => {
+    if (c < 0) return;
+    const lines = [];
+    for (let r = hr + 1; r < rows.length; r++) {
+      const v = String(rows[r][c] ?? '').trim();
+      if (/TEL|すまいるわん/.test(v)) break;
+      v.split(/\n/).map(x => x.trim()).filter(Boolean).forEach(t => lines.push({ y: r, t }));
+    }
+    let lastBlock = 'upper';
+    parseColumn(lines, true).forEach(e => {
+      // 時間のない予定（通院介助／2週に1回 など）は直前の予定と同じ段へ
+      const blk = e.start ? blockByTime(e.start) : lastBlock; lastBlock = blk;
+      days[dow][blk].push({ ...emptyEntry(), type: e.type, start: e.start, end: e.end, detail: e.detail, note: e.note });
+      count++;
+    });
+  });
+  return { name, days, count };
+}
+async function importScheduleXlsx(input) {
+  const f = input.files[0]; input.value = ''; if (!f) return;
+  paperMsg('📗 Excelを読み込み中…');
+  let list = [];
+  try {
+    await loadLib('xlsx');
+    const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+    const seen = new Set();
+    wb.SheetNames.forEach(sn => {
+      const r = parseScheduleSheet(wb.Sheets[sn], sn);
+      if (!r || !r.count) return;
+      // 同じ氏名のシートが複数ある（例:（介護）（カイゴ））ときはシート名で区別
+      if (seen.has(r.name)) r.name = String(sn).replace(/[\s　]+/g, ' ').trim();
+      seen.add(r.name); list.push(r);
+    });
+  } catch (e) { paperMsg(''); alert('Excelを読み込めませんでした\n' + ((e && e.message) || e)); return; }
+  paperMsg('');
+  if (!list.length) { alert('予定表のシートが見つかりませんでした（曜日の見出し「日 月 火 水 木 金 土」がある表を探します）'); return; }
+  const store = getStore(), overwrite = list.filter(r => store[r.name]).length;
+  if (!confirm(`${list.length}名分の予定表が見つかりました（予定 合計${list.reduce((a, r) => a + r.count, 0)}件）。\n取り込んで保存しますか？${overwrite ? `\n※ すでに保存済みの ${overwrite}名分は上書きされます。` : ''}`)) return;
+  let ok = 0;
+  for (const r of list) { paperMsg(`📗 保存中…（${ok + 1}/${list.length}）${r.name}`); if (await saveSchedule(r.name, { name: r.name, days: r.days })) ok++; }
+  paperMsg('');
+  refreshSavedList(); refreshUserPick();
+  state = { name: list[0].name, days: list[0].days }; document.getElementById('userName').value = state.name; currentDay = 1; setMode('sheet'); render();
+  alert(`${ok}名分の予定表を取り込みました。\n「保存済み利用者」から選んで、内容を確認してください。\n（上段=12時前・中段=12〜17時・下段=17時以降 に振り分けています）`);
+}
+// Shift+クリック: 今の用紙を画像にして読み取れるか確認（動作チェック用）
+async function paperSelfTest() {
+  const log = []; paperMsg('診断開始…');
+  const tryStep = async (name, fn) => { try { await Promise.race([fn(), new Promise((_, j) => setTimeout(() => j(new Error('timeout')), 8000))]); log.push(name + ':OK'); } catch (e) { log.push(name + ':NG(' + ((e && e.message) || e) + ')'); } paperMsg('診断中: ' + log.join(' ')); };
+  const wk = src => new Promise((ok, ng) => { const w = new Worker(src); w.onmessage = e => { e.data === 'ok' ? ok() : ng(new Error(String(e.data))); w.terminate(); }; w.onerror = e => ng(new Error(e.message || 'error')); });
+  const blobOf = code => URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
+  await tryStep('blobWorker', () => wk(blobOf("postMessage('ok')")));
+  await tryStep('importScripts', () => wk(blobOf("try{importScripts('" + OCR_CORE + "');postMessage(typeof TesseractCore==='function'?'ok':'no core')}catch(e){postMessage('E '+e.message)}")));
+  await tryStep('workerWasm', () => wk(blobOf("WebAssembly.compile(new Uint8Array([0,97,115,109,1,0,0,0])).then(()=>postMessage('ok')).catch(e=>postMessage('E '+e.message))")));
+  await tryStep('mainWasm', () => WebAssembly.compile(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0])));
+  paperMsg('診断: ' + log.join(' '));
+  if (!window._ocrFull) return;
+  try {
+    await loadLib('pdfOut');
+    const cv = await html2canvas(document.getElementById('paper'), { scale: 2.5, backgroundColor: '#fff' });
+    const img = await new Promise(r => cv.toBlob(r, 'image/png'));
+    const r = await readSchedulePaper(new File([img], 'test.png', { type: 'image/png' }));
+    paperMsg(log.join(' ') + ` ✅ 読み取りテストOK: ${r.name || '(名前なし)'} ${r.count}件 / ` + r.days.map((d, i) => DAYS[i] + ':' + dayEntries(d).map(e => e.type + (e.start ? ' ' + e.start : '')).join(',')).join(' '));
+  } catch (e) { paperMsg(log.join(' ') + ' ⚠ 読み取りテスト失敗: ' + ((e && e.message) || e)); }
+}
+async function importPaper(input) {
+  const file = input.files[0]; input.value = '';
+  if (!file) return;
+  let res;
+  try { res = await readSchedulePaper(file); }
+  catch (e) { paperMsg('⚠ 取込できませんでした（' + ((e && e.message) || e) + '）'); alert('取込できませんでした\n' + ((e && e.message) || e)); return; }
+  paperMsg('');
+  if (!res.count) { alert('予定を読み取れませんでした。スキャンの向きや濃さを確認してください。'); return; }
+  if (hasContent() && !confirm(`読み取った予定 ${res.count}件で、今の予定表を置き換えますか？（保存済みの内容は「保存」を押すまで変わりません）`)) return;
+  state = { name: res.name, days: res.days }; currentDay = 1;
+  document.getElementById('userName').value = state.name; document.getElementById('savedSelect').value = '';
+  setMode('sheet'); render();
+  const nameMsg = !res.name ? '\n⚠ 利用者名は読み取れませんでした。名前を入力してください。'
+    : res.matched && res.matched !== 'exact' ? `\n利用者名は「${res.readName}」と読めたので、登録済みの「${res.name}」にしました。違っていたら名前を直してください。`
+    : !res.matched ? `\n⚠ 利用者名「${res.name}」は登録済みの利用者に見つかりませんでした。読み間違いがないか確認してください。` : '';
+  alert(`予定 ${res.count}件を読み取りました${res.name ? `（${res.name} 様）` : ''}。${nameMsg}\n読み間違いがないか右の用紙で確認・修正し、よければ「💾 保存」を押してください。\nそのあと「📝 訪問記録」タブで記録を作れます。`);
+}
+
+refreshSavedList();
+render();
+initCloud();
+if ((window.claude && typeof window.claude.use === 'function') || supaOn()) document.getElementById('sbBox').style.display = 'none'; else sbCheck();
+</script>
+</body>
+</html>
