@@ -178,7 +178,18 @@
   .rec-items .chip { font-size: 11px; padding: 1px 7px; }
   .rec-add { width: 100%; font: inherit; font-size: 11px; padding: 2px 5px; margin-top: 3px; border: 1px dashed var(--line); border-radius: 4px; background: transparent; color: var(--text); }
   @media print { .rec-items button { display: none; } }
-  body.mode-record .paper-scroll { display: none; }
+  body.mode-record .paper-scroll, body.mode-help .paper-scroll { display: none; }
+  #helpView { width: 100%; max-width: 900px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; line-height: 1.7; }
+  #helpView h2 { margin: 0 0 6px; font-size: 20px; }
+  #helpView h3 { margin: 22px 0 6px; font-size: 16px; border-left: 4px solid var(--accent); padding-left: 8px; scroll-margin-top: 12px; }
+  #helpView .lead { margin: 0 0 10px; }
+  #helpView ol, #helpView ul { padding-left: 1.4em; margin: 4px 0; }
+  #helpView .hint { font-size: 12px; }
+  .help-toc { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 4px; }
+  .help-toc a { font-size: 12px; padding: 3px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--accent); text-decoration: none; }
+  .help-table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 6px 0; }
+  .help-table th, .help-table td { border: 1px solid var(--line); padding: 5px 8px; text-align: left; vertical-align: top; }
+  .help-table th { background: var(--th-bg); white-space: nowrap; }
   @media print {
     body.mode-record #recordView { border: none; padding: 0; max-width: none; }
     body.mode-record .rec-table th.act, body.mode-record .rec-table td.act, body.mode-record .rec-table th.chk, body.mode-record .rec-table td.chk { display: none; }
@@ -194,6 +205,7 @@
     <div class="mode-tabs">
       <button id="modeSheetBtn" class="active" onclick="setMode('sheet')">📅 予定表</button>
       <button id="modeRecordBtn" onclick="setMode('record')">📝 訪問記録</button>
+      <button id="modeHelpBtn" onclick="setMode('help')">📖 使い方</button>
     </div>
     <div id="sheetPanel">
     <div class="toolbar">
@@ -327,6 +339,102 @@
     <div class="print-note">↓ 印刷プレビュー（A4横）。「印刷する」ボタンでこの用紙だけが印刷されます。</div>
     <div class="paper-scroll"><div class="paper" id="paper"></div></div>
     <div id="recordView" style="display:none"></div>
+    <div id="helpView" style="display:none">
+      <h2>📖 使い方</h2>
+      <p class="lead">訪問介護すまいるわんの週間予定表・訪問記録を作るツールです。ログイン不要、事業所の合言葉で開きます。</p>
+      <nav class="help-toc"><a href="#h-start">はじめに</a><a href="#h-sheet">予定表を作る</a><a href="#h-import">取り込み</a><a href="#h-client">利用者情報とアセスメント</a><a href="#h-record">訪問記録を作る</a><a href="#h-output">保存と出力</a><a href="#h-trouble">困ったとき</a></nav>
+
+      <h3 id="h-start">はじめに</h3>
+      <ol>
+        <li>スマホ・パソコンのブラウザ（Safari・Chrome など）でこのページを開く</li>
+        <li>「合言葉を入力してください」と出たら、事業所の合言葉を入れて OK（合言葉は管理者に確認）</li>
+        <li>左上に「☁ 共有保存（予定表 ○名）」と出れば準備完了</li>
+      </ol>
+      <ul>
+        <li>保存した予定表・利用者情報・訪問記録は全員で共有されます。ほかの人の変更は30秒ほどで自分の画面にも出ます</li>
+        <li>左上が「💾 この端末に保存…」のときは共有されていません。その表示を押して合言葉を入れ直し、再読み込みしてください</li>
+        <li>LINE などのアプリの中で開くと動かないことがあります。「ブラウザで開く」を選んでください</li>
+      </ul>
+
+      <h3 id="h-sheet">予定表を作る</h3>
+      <p>予定は曜日ごとに、上段（午前）・中段（昼）・下段（夕方〜夜）の3つの枠に入れます。</p>
+      <ol>
+        <li>「📅 予定表」タブで「保存済み利用者」から選ぶ（新しい人は「＋ 新規作成」→ 名前を入力）</li>
+        <li>曜日のボタン（月〜日）を押す</li>
+        <li>入れたい段の「＋ 追加」を押し、種別・時間・内容・備考を選ぶ
+          <ul>
+            <li>内容は候補のボタンを押して選ぶ。青が選ばれている内容で、もう一度押すと外れる。候補にないものは下の欄に入力して Enter</li>
+          </ul>
+        </li>
+        <li>同じ内容の曜日は「この曜日の内容を ○曜にコピー」</li>
+        <li>右の用紙で確認して「💾 保存」。「🖨 印刷する」でA4横の予定表を印刷</li>
+      </ol>
+
+      <h3 id="h-import">取り込み</h3>
+      <table class="help-table">
+        <tr><th>ボタン</th><th>選ぶファイル</th><th>入るもの・注意</th></tr>
+        <tr><td>📗 Excelから一括取込</td><td>すまいるわん週間予定表.xlsx（利用者ごとに1シート）</td><td>全員分の予定表。12時前＝上段、12〜17時＝中段、17時以降＝下段。同じ名前は上書き</td></tr>
+        <tr><td>📄 紙(PDF)から取込</td><td>印刷した週間予定表をスキャンしたPDF</td><td>1人分の予定表と名前（20〜30秒）。手書き・斜めの写真は不可。必ず確認して保存</td></tr>
+        <tr><td>👥 利用者CSV取込</td><td>カイポケの「利用者情報」CSV</td><td>利用中の人の名前・フリガナ・住所・電話・緊急連絡先</td></tr>
+      </table>
+
+      <h3 id="h-client">利用者情報とアセスメント</h3>
+      <ol>
+        <li>「📅 予定表」タブで利用者を選び、名前の下の「📇 利用者情報」を開く</li>
+        <li>住所・電話・緊急連絡先・メモ（鍵の場所・アレルギーなど）を入れて「💾 利用者情報を保存」</li>
+        <li>アセスメントは「📋 アセスメント取込（PDF）」→ カイポケ等から出力したPDFを選ぶ → 確認画面の名前と内容を確かめて OK</li>
+      </ol>
+      <table class="help-table">
+        <tr><th>アセスメントの反映先</th><th>例</th></tr>
+        <tr><td>記録の文章</td><td>総入れ歯 →「義歯を外して洗浄し、口腔ケアを行った」／腰痛 →「腰に負担がかからないよう配慮した」</td></tr>
+        <tr><td>様子の候補</td><td>躁鬱の方 →「気分の波」「よく眠れた」などが★付きで先頭に</td></tr>
+        <tr><td>NG表現</td><td>特記に「〜の話はしない」とあれば、その方のNGに入る</td></tr>
+        <tr><td>カイポケの実施項目</td><td>口腔清潔介助が要援助 → 朝・夜の訪問に「口腔ケア」が最初から選ばれる</td></tr>
+      </table>
+      <p class="hint">スキャンした紙のアセスメントと、番号を丸で囲む欄（寝返り・歩行など）は読み取れません。</p>
+
+      <h3 id="h-record">訪問記録を作る</h3>
+      <ol>
+        <li>「📝 訪問記録」タブで、利用者・期間・担当者を選ぶ</li>
+        <li>「📝 記録を生成」→ 右に訪問ごとの行が出る</li>
+        <li>行ごとに確認・修正する
+          <ul>
+            <li><b>実施項目</b>：カイポケでチェックする項目が青く選ばれている。押すと外れ、「＋項目」でカイポケと同じ並びの一覧から足せる</li>
+            <li><b>記録の文章</b>：直接書き換えられる。「↻」で別の言い回し</li>
+            <li><b>様子</b>：「😊様子」で一文を足す（★はアセスメントからのおすすめ）</li>
+            <li>出力しない行は左のチェックを外す</li>
+          </ul>
+        </li>
+        <li>橙色の行（NG表現）や赤い行（同じ文章）は「↻」か手直しで直す</li>
+      </ol>
+      <p><b>順番の注意</b>：実施項目を選び直すと、その行の文章は作り直されます。先に項目を選び、そのあと文章を手で直してください。</p>
+      <p><b>NG表現</b>：「🚫 NG表現」で「全員に共通」と「○○様だけ」の2つを編集できます（1行に1つ）。</p>
+
+      <h3 id="h-output">保存と出力</h3>
+      <table class="help-table">
+        <tr><th>ボタン</th><th>できること</th></tr>
+        <tr><td>💾 記録を保存</td><td>利用者ごと・月ごとに保存（全員で共有）。同じ日時は上書き</td></tr>
+        <tr><td>📚 保存した訪問記録 → 開く</td><td>過去の月の記録を呼び出して出し直し・修正</td></tr>
+        <tr><td>PDF保存</td><td>A4縦のPDF</td></tr>
+        <tr><td>Word書き出し</td><td>A4縦の表（日時／担当／種別・実施項目／記録）のWordファイル</td></tr>
+        <tr><td>🖨 印刷</td><td>画面の表をそのまま印刷</td></tr>
+        <tr><td>表をコピー／各行の📋</td><td>全行、またはその行の文章だけをコピー（カイポケの特記事項に貼る）</td></tr>
+      </table>
+      <p class="hint">カイポケへは直接入力できません。青い実施項目を見ながらチェックし、文章は📋でコピーして貼り付けます。</p>
+
+      <h3 id="h-trouble">困ったとき</h3>
+      <table class="help-table">
+        <tr><th>こんなとき</th><th>直し方</th></tr>
+        <tr><td>ほかの人が保存した内容が出ない</td><td>左上が「☁ 共有保存」か確認。「💾 この端末に保存」なら、その表示を押して合言葉を入れ直す</td></tr>
+        <tr><td>新しいボタンが見当たらない</td><td>10分ほど待って再読み込み（パソコンは ⌘+Shift+R）</td></tr>
+        <tr><td>「合言葉が違います」</td><td>管理者に最新の合言葉を確認</td></tr>
+        <tr><td>「表の枠線を見つけられませんでした」</td><td>スキャナーでまっすぐ読み直す。写真・手書きは不可</td></tr>
+        <tr><td>紙PDFの名前や時間が違う</td><td>取り込み後に手で直してから「💾 保存」</td></tr>
+        <tr><td>アセスメントが読めない</td><td>文字入りのPDF（カイポケ等から出力）を使う。スキャンは不可</td></tr>
+        <tr><td>記録の行が橙色／赤</td><td>橙色＝NG表現、赤＝同じ文章。「↻」か手直し</td></tr>
+      </table>
+    </div>
+
     <div id="statePop"></div>
     <div id="kpPop"></div>
   </div>
@@ -1054,9 +1162,12 @@ function setMode(m) {
   document.getElementById('sheetPanel').style.display = m === 'sheet' ? '' : 'none';
   document.getElementById('recordPanel').style.display = m === 'record' ? '' : 'none';
   document.getElementById('recordView').style.display = m === 'record' ? '' : 'none';
+  document.getElementById('helpView').style.display = m === 'help' ? '' : 'none';
+  document.body.classList.toggle('mode-help', m === 'help');
+  document.getElementById('modeHelpBtn').classList.toggle('active', m === 'help');
   document.getElementById('modeSheetBtn').classList.toggle('active', m === 'sheet');
   document.getElementById('modeRecordBtn').classList.toggle('active', m === 'record');
-  document.querySelector('.print-note').textContent = m === 'record'
+  document.querySelector('.print-note').textContent = m === 'help' ? '' : m === 'record'
     ? '↓ 訪問記録（チェックした行だけが印刷・書き出しされます）'
     : '↓ 印刷プレビュー（A4横）。「印刷する」ボタンでこの用紙だけが印刷されます。';
   pageStyle.textContent = m === 'record' ? '@page { size: A4 portrait; margin: 12mm; }' : '@page { size: A4 landscape; margin: 0; }';
