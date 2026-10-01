@@ -203,7 +203,10 @@
 <div class="app">
   <div class="editor">
     <h1>週間予定表 作成ツール <span id="syncStatus" class="sync local" onclick="changePass()" title="（Supabase版）クリックで合言葉を変更">💾 この端末に保存</span></h1>
-    <div id="syncBanner" style="display:none">⚠ 共有に接続されていません。今の入力はこの端末にだけ保存され、ほかの人には届きません。 <button class="small" onclick="changePass()">合言葉を入力して接続</button></div>
+    <div id="syncBanner" style="display:none">
+      <div id="syncBannerMsg">⚠ 共有に接続されていません。合言葉を入れて「接続」を押してください（このままだと入力はこの端末にだけ保存され、ほかの人には届きません）。</div>
+      <div class="row" style="margin-top:6px"><input type="password" id="passInput" placeholder="合言葉" autocomplete="current-password" onkeydown="if(event.key==='Enter')connectWithPass()"><button class="small primary fixed" onclick="connectWithPass()">接続</button></div>
+    </div>
     <div class="mode-tabs">
       <button id="modeSheetBtn" class="active" onclick="setMode('sheet')">📅 予定表</button>
       <button id="modeRecordBtn" onclick="setMode('record')">📝 訪問記録</button>
@@ -511,6 +514,7 @@ function docId(name) { return btoa(unescape(encodeURIComponent(name))).replace(/
 function setSyncStatus(text, cls) {
   const el = document.getElementById('syncStatus'); if (el) { el.textContent = text; el.className = 'sync ' + (cls || ''); }
   const b = document.getElementById('syncBanner'); if (b) b.style.display = (supaOn() && cls === 'local') ? '' : 'none';
+  const m = document.getElementById('syncBannerMsg'); if (m && supaMsg) m.textContent = supaMsg;
 }
 function localStore() { try { return JSON.parse(lsGet(STORAGE_KEY) || '{}'); } catch { return {}; } }
 function getStore() { return (DB && cloud.schedules) ? cloud.schedules : localStore(); }
@@ -580,23 +584,33 @@ function supaDB(pass) {
     collection(kind) { return { onSnapshot(cb, err) { (subs[kind] = subs[kind] || []).push({ cb, err }); start(); } }; },
   };
 }
+// 合言葉はポップアップ(prompt)を使わず、画面上の入力欄で受け取る（ポップアップが出ないブラウザがあるため）
+let supaMsg = '';
 async function supaConnect() {
-  let pass = lsGet('smilewan_pass') || '';
-  for (;;) {
-    if (!pass) { pass = prompt('合言葉を入力してください（事業所で共有している合言葉）'); if (pass === null) return null; pass = pass.trim(); }
-    try { await supaRpc('smilewan_list', { p_pass: pass }); lsSet('smilewan_pass', pass); return supaDB(pass); }
-    catch (e) { if (e.code === 'badpass') { alert('合言葉が違います'); pass = ''; continue; } alert('保存先(Supabase)に接続できませんでした。通信状態を確認してください。\n' + e.message); return null; }
+  const pass = (lsGet('smilewan_pass') || '').trim();
+  if (!pass) { supaMsg = '⚠ 共有に接続されていません。合言葉を入れて「接続」を押してください（このままだと入力はこの端末にだけ保存され、ほかの人には届きません）。'; return null; }
+  try { await supaRpc('smilewan_list', { p_pass: pass }); supaMsg = ''; return supaDB(pass); }
+  catch (e) {
+    if (e.code === 'badpass') { lsSet('smilewan_pass', ''); supaMsg = '⚠ 合言葉が違います。もう一度入れて「接続」を押してください。'; }
+    else supaMsg = '⚠ 保存先に接続できませんでした。通信状態を確認して、ページを再読み込みしてください。';
+    return null;
   }
+}
+function connectWithPass() {
+  const v = (document.getElementById('passInput').value || '').trim();
+  if (!v) { document.getElementById('passInput').focus(); return; }
+  lsSet('smilewan_pass', v); location.reload();
 }
 function changePass() {
   if (!supaOn()) return;
-  const v = prompt('新しい合言葉を入力してください（事業所で決めた合言葉）'); if (v === null) return;
-  lsSet('smilewan_pass', v.trim()); location.reload();
+  const b = document.getElementById('syncBanner'); b.style.display = '';
+  document.getElementById('syncBannerMsg').textContent = '新しい合言葉を入れて「接続」を押してください。';
+  document.getElementById('passInput').focus();
 }
 async function initCloud() {
   try { if (window.claude && typeof window.claude.use === 'function') DB = await window.claude.use('db'); } catch { DB = null; }
   if (!DB && supaOn()) { setSyncStatus('☁ 保存先に接続中…', 'wait'); DB = await supaConnect(); }
-  if (!DB) { setSyncStatus(supaOn() ? '💾 この端末に保存（合言葉が未入力です）' : '💾 この端末に保存（共有なし）', 'local'); return; }
+  if (!DB) { setSyncStatus(supaOn() ? '💾 この端末に保存（共有に未接続）' : '💾 この端末に保存（共有なし）', 'local'); return; }
   setSyncStatus('☁ 共有データベースに接続中…', 'wait');
   DB.collection('schedules').onSnapshot(snap => {
     const m = {};
@@ -1772,6 +1786,31 @@ function assessHints(row, who) {
   H.life = pool.filter(x => x[0] === 'life').map(x => x[1]).join('');
   return H;
 }
+// ---- 1日の流れ：同じ日のそれより前の訪問を見て、書き出しや起床の文を合わせる ----
+function dayCtx(row) {
+  const k = ymd(row.date), st = row.e.start || '';
+  const prev = recRows.filter(r => r !== row && ymd(r.date) === k && (r.e.start || '') < st);
+  return { first: !prev.length, hadWake: prev.some(r => kpOf(r).includes('起床・就寝|起床介助')), hadBath: prev.some(r => /入浴/.test(r.e.type || '') || kpOf(r).some(x => x.startsWith('入浴・清拭|'))) };
+}
+const SG_OPEN = {
+  朝: ['訪問時、本人へ声掛けすると落ち着いた様子で応答された。', '訪問時、本人へ挨拶すると穏やかに応答された。', '本人の起床状況を確認し、声掛けを行いながら様子を確認した。', '朝の訪問時、本人は室内で落ち着いて過ごされていた。'],
+  昼: ['訪問時、本人は室内で落ち着いて過ごされていた。', '訪問時、本人へ挨拶すると穏やかに応答された。'],
+  夕方: ['夕方の訪問時、本人へ声掛けすると落ち着いた様子で応答された。', '夕方の訪問時、本人は室内で過ごされていた。'],
+  夜: ['夜の訪問時、本人へ声掛けすると穏やかに応答された。', '夜の訪問時、本人は室内で落ち着いて過ごされていた。'],
+};
+const SG_FOLLOW = { 昼: ['午前中の様子を伺い、体調を確認した。', '前回の訪問からの様子を伺い、体調を確認した。'], 夕方: ['日中の過ごし方を伺い、体調を確認した。'], 夜: ['日中の過ごし方を伺い、体調を確認した。', '夕食後の様子を伺い、体調を確認した。'] };
+const SG_SAY = {
+  朝: ['本人から「ありがとう」と発言あり、落ち着いて過ごされていた。', '本人から「朝は少しゆっくりしたい」と話があった。'],
+  昼: ['本人から「ありがとう」と発言あり、落ち着いて過ごされていた。'],
+  夕方: ['本人から「ありがとう」と発言あり、落ち着いて過ごされていた。'],
+  夜: ['本人から「今日はゆっくり休みます」と話があった。', '本人から「ありがとう、おやすみなさい」と発言あり。'],
+};
+const TK_OPEN = {
+  朝: ['朝の訪問時、利用者様へ挨拶し体調を確認した。', '訪問時、利用者様の起床状況と体調を確認した。', '訪問時、利用者様へ声掛けし体調を確認した。'],
+  昼: ['訪問時、利用者様へ挨拶し体調を確認した。', '訪問時、利用者様の表情や顔色を確認した。'],
+  夜: ['夜の訪問時、利用者様の体調と表情を確認した。', '夕方の訪問時、利用者様へ声掛けし体調を確認した。'],
+};
+const TK_FOLLOW = { 昼: ['午前中の様子を伺い、利用者様の体調を確認した。'], 夜: ['日中の過ごし方を伺い、利用者様の体調を確認した。', '夜の訪問時、日中の様子を伺い体調を確認した。'] };
 function genShogai(row) {
   const AH = assessHints(row, '本人');
   const kp = kpOf(row), has = k => kp.includes(k), hasC = c => kp.some(k => k.startsWith(c + '|'));
@@ -1792,10 +1831,11 @@ function genShogai(row) {
     if (!s.length) s.push(pick(SG.clean), pick(SG.cleanMore));
     if (has('服薬・医療|服薬介助・確認') || /服薬/.test(row.e.detail || '')) s.push(pick(SG.med));
   } else {
-    s.push(pick(SG.open), pick(SG.health));
+    const ctx = dayCtx(row), late = tod === '夕方' || tod === '夜';
+    if (!ctx.first && SG_FOLLOW[tod]) s.push(pick(SG_FOLLOW[tod])); else s.push(pick(SG_OPEN[tod] || SG.open), pick(SG.health));
     if (AH.observe) s.push(AH.observe);
-    if (has('起床・就寝|就寝介助')) s.push(pick(SG.night));
-    else if ((has('起床・就寝|起床介助') || has('身体整容|更衣介助')) && !/着替え/.test(AH.care)) s.push(pick(SG.dress));
+    if (has('起床・就寝|就寝介助') || (late && has('身体整容|更衣介助'))) s.push(pick(SG.night));
+    else if (((has('起床・就寝|起床介助') && !ctx.hadWake) || has('身体整容|更衣介助')) && !/着替え/.test(AH.care)) s.push(pick(SG.dress.filter(x => tod === '朝' || !/起床/.test(x))));
     const oral = has('身体整容|口腔ケア'), dentS = assessOf((state.name || '').trim())?.dentures;
     if (has('身体整容|整容') || has('身体整容|洗面') || has('起床・就寝|起床介助')) s.push(oral ? `洗面・${dentS ? '義歯の洗浄・' : ''}口腔ケアについても声掛けを行い、本人のペースで実施された。` : pick(SG.wash));
     else if (oral) s.push(dentS ? '義歯の洗浄・口腔ケアについて声掛けし、本人ができる部分は自身で行っていただいた。' : '口腔ケアについて声掛けし、本人のペースで実施された。');
@@ -1809,7 +1849,7 @@ function genShogai(row) {
   if (cat === '入浴' && AL.care) s.push(AL.care);
   if (cat === '家事' && AL.med && /服薬/.test(s.join(''))) { /* 服薬の文は既にある */ } else if (cat === '家事' && AL.med) s.push(AL.med);
   if (AL.life) s.push(AL.life);
-  if (sayOn && Math.random() < 0.5) s.push(pick(SG.say[cat])); else if (Math.random() < 0.6) s.push(pick(SG.mood));
+  if (sayOn && Math.random() < 0.5) s.push(pick(cat === '身体' ? (SG_SAY[tod] || SG.say.身体) : SG.say[cat])); else if (Math.random() < 0.6) s.push(pick(SG.mood));
   return s.join('');
 }
 function genTokki(row) {
@@ -1820,7 +1860,8 @@ function genTokki(row) {
   const meal = ((row.e.detail || '').match(/朝食|昼食|夕食/) || [tod === '朝' ? '朝食' : tod === '昼' ? '昼食' : '夕食'])[0];
   const a = assessOf((state.name || '').trim()), dent = a && a.dentures;
   const sayOn = document.getElementById('recSay') ? document.getElementById('recSay').checked : true;
-  const s = [pick(TK.open)];
+  const ctx = dayCtx(row);
+  const s = [(!ctx.first && TK_FOLLOW[tod]) ? pick(TK_FOLLOW[tod]) : pick(TK_OPEN[tod] || TK.open)];
   const AH = assessHints(row, '利用者様'); if (AH.observe) s.push(AH.observe);
   let cat = tod;
   if (label === '入浴') {
@@ -1845,7 +1886,10 @@ function genTokki(row) {
   } else {
     // 身体（朝・昼・夜）
     const acts = [];
-    if (has('起床・就寝|起床介助')) acts.push('起床');
+    // 夜の就寝介助がある日は「夕食 → 更衣・就寝準備」の順に並べる
+    const mealFirst = has('起床・就寝|就寝介助') && K && (/生活|家事/.test(row.e.type || '') || ['調理', '清掃', '洗濯', '買物等'].some(hasC)) && (/朝食|昼食|夕食|提供|準備/.test(row.e.detail || '') || hasC('調理'));
+    if (mealFirst) s.push(`${meal}の準備・配膳を行い、食後に就寝の支度へ移った。`);
+    if (has('起床・就寝|起床介助') && !ctx.hadWake && tod === '朝') acts.push('起床');
     if (hasC('排泄')) acts.push(K ? 'トイレへの移動・排泄介助' : 'トイレへの移動');
     if (has('身体整容|更衣介助') || has('起床・就寝|起床介助') || has('起床・就寝|就寝介助')) acts.push('更衣');
     if (has('身体整容|整容') || has('身体整容|洗面')) acts.push(K ? '整容' : '洗面・整容');
@@ -1864,7 +1908,7 @@ function genTokki(row) {
       const what = it.includes('掃除') ? (/片付/.test(row.e.detail || '') ? '片付け' : '掃除') : it.includes('洗濯') ? '洗濯' : it.includes('一般的な調理・配下膳') ? '調理' : it.includes('買い物・薬の受け取り') ? '買い物' : '身の回りのこと';
       s.push(pick([`${what}は利用者様と一緒に行い、できるところはご自身で取り組んでいただいた。`, `${what}の手順を声掛けで確認しながら、利用者様と一緒に行った。`]));
     }
-    if (/生活|家事/.test(row.e.type || '') || ['調理', '清掃', '洗濯', '買物等'].some(hasC)) {
+    if (!mealFirst && (/生活|家事/.test(row.e.type || '') || ['調理', '清掃', '洗濯', '買物等'].some(hasC))) {
       if (/朝食|昼食|夕食|提供|準備/.test(row.e.detail || '') || hasC('調理')) s.push(K ? `${meal}の準備・配膳を行った。` : `${meal}の準備は手順を声掛けしながら一緒に行った。`);
       else s.push(K ? pick(['生活に必要な準備を行い、室内を整えた。', '過ごしやすいよう生活環境を整えた。']) : '身の回りの整理は、利用者様と一緒に行った。');
     }
@@ -2697,6 +2741,7 @@ async function importPaper(input) {
   alert(`予定 ${res.count}件を読み取りました${res.name ? `（${res.name} 様）` : ''}。${nameMsg}\n読み間違いがないか右の用紙で確認・修正し、よければ「💾 保存」を押してください。\nそのあと「📝 訪問記録」タブで記録を作れます。`);
 }
 
+try { const m = location.hash.match(/[#&]p=([^&]+)/); if (m) { lsSet('smilewan_pass', decodeURIComponent(m[1])); history.replaceState(null, '', location.pathname + location.search); } } catch {}
 refreshSavedList();
 render();
 initCloud();
