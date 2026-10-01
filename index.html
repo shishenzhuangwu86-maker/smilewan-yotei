@@ -301,6 +301,8 @@
         <select id="recStaff" onchange="lsSet('smilewan_staff',this.value); recRows.forEach(r=>{if(!r.staffEdited)r.staff=this.value}); if(recRows.length)renderRecordView();"></select>
         <button class="small fixed" onclick="editStaffList()">担当者を編集</button>
       </div>
+      <label>区分（Wordの1行目に入ります）</label>
+      <select id="recKubun" onchange="lsSet('smilewan_kubun',this.value)"><option value="介護">介護</option><option value="障害">障害</option><option value="">（なし）</option></select>
       <details id="ngBox" style="margin-top:6px">
         <summary>🚫 NG表現（記録に書かない言葉）</summary>
         <div class="hint" style="margin:4px 0">含まれる文は自動で避け、含まれると橙色で警告します。1行に1つ（一部が一致すればNG）。</div>
@@ -331,7 +333,7 @@
         「📄 紙(PDF)から取込」→ 印刷した週間予定表をスキャンしたPDFを読み取り、予定表に自動で入れます（ログイン不要。読み取った内容は必ず確認してください）。<br>
         右側に訪問ごとの記録が出ます。文章は直接書き換えられ、「↻」で別の言い回しに変わります。<br>
         「表をコピー」→ Excelに貼り付け／各行の「📋」→ その文章だけコピー（カイポケ入力用）。<br>
-        「Word書き出し」→ チェックした行を Word（A4縦の表：日時／担当／種別・実施項目／記録）で保存します。<br>
+        「Word書き出し」→ チェックした行を、特記事項の形（日付ごとに【朝・身体・生活・排泄】＋文章）のWordで保存します。<br>
         「PDF保存」→ チェックした行をA4縦のPDFファイルとして保存します（記録の控え・提出用）。
       </div>
     </div>
@@ -418,7 +420,7 @@
         <tr><td>💾 記録を保存</td><td>利用者ごと・月ごとに保存（全員で共有）。同じ日時は上書き</td></tr>
         <tr><td>📚 保存した訪問記録 → 開く</td><td>過去の月の記録を呼び出して出し直し・修正</td></tr>
         <tr><td>PDF保存</td><td>A4縦のPDF</td></tr>
-        <tr><td>Word書き出し</td><td>A4縦の表（日時／担当／種別・実施項目／記録）のWordファイル</td></tr>
+        <tr><td>Word書き出し</td><td>特記事項の形（日付ごとに【朝・身体・生活・排泄】＋文章）のWordファイル。1行目の区分（介護／障害）は左の「区分」で選ぶ</td></tr>
         <tr><td>🖨 印刷</td><td>画面の表をそのまま印刷</td></tr>
         <tr><td>表をコピー／各行の📋</td><td>全行、またはその行の文章だけをコピー（カイポケの特記事項に貼る）</td></tr>
       </table>
@@ -1861,7 +1863,20 @@ async function exportRecordsXlsx() {
   }
 }
 
-// ---- Word書き出し（.docx・A4縦の表） ----
+// ---- Word書き出し（特記事項の形：日付ごとに【朝・身体・生活・排泄】＋改行＋文章。見本「介護 高山辰雄9月特記事項.docx」） ----
+function recLabel(r) {
+  const kp = kpOf(r), has = c => kp.some(k => k.startsWith(c + '|'));
+  if (/入浴/.test(r.e.type || '') || (has('入浴・清拭') && !has('起床・就寝'))) return '入浴';
+  if (r.kind === '家事援助') {
+    const w = detailLines(r.e.detail).flatMap(x => x.split(/[・、]/)).map(x => x.replace(/^買い物$/, '買い物代行').replace(/[（）()]/g, '').trim()).filter(x => x && !/^生活\d*$/.test(x));
+    return [...new Set(w)].join('・') || '家事';
+  }
+  const h = parseInt(r.e.start || '12', 10), tod = h < 11 ? '朝' : h < 16 ? '昼' : '夜';
+  const parts = [tod, '身体'];
+  if (/生活|家事/.test(r.e.type || '') || ['調理', '清掃', '洗濯', '買物等', '衣類・寝具'].some(has)) parts.push('生活');
+  if (has('排泄')) parts.push('排泄');
+  return parts.join('・');
+}
 async function exportRecordsDocx() {
   const rows = recRows.filter(r => r.on);
   if (!rows.length) { alert('出力する行がありません'); return; }
@@ -1872,36 +1887,27 @@ async function exportRecordsDocx() {
   try {
     await loadLib('docx');
     const D = window.docx;
-    const name = (state.name || '').trim();
-    const from = document.getElementById('recFrom').value, to = document.getElementById('recTo').value;
-    const FONT = window._docxFont || 'Yu Gothic';
-    const run = (text, o = {}) => new D.TextRun({ text, font: { eastAsia: FONT, ascii: FONT, hAnsi: FONT }, size: o.size || 20, bold: !!o.bold, color: o.color });
-    const para = (parts, o = {}) => new D.Paragraph({ children: parts, alignment: o.align, spacing: { after: o.after ?? 0, line: 300 } });
-    const border = { style: D.BorderStyle.SINGLE, size: 4, color: '555555' };
-    const borders = { top: border, bottom: border, left: border, right: border };
-    const W = [1700, 1300, 2000, 4600]; // 列幅（1/20pt）
-    const cell = (children, i, head) => new D.TableCell({ children, borders, width: { size: W[i], type: D.WidthType.DXA }, shading: head ? { fill: 'EEEEEE', type: D.ShadingType.CLEAR, color: 'auto' } : undefined, margins: { top: 60, bottom: 60, left: 90, right: 90 } });
-    const header = new D.TableRow({ tableHeader: true, children: ['日時', '担当', '種別・実施項目', '記録'].map((t, i) => cell([para([run(t, { bold: true })])], i, true)) });
-    const body = rows.map(r => {
-      const d = `${String(r.date.getMonth() + 1).padStart(2, '0')}/${String(r.date.getDate()).padStart(2, '0')}（${DAYS[r.date.getDay()]}）`;
-      return new D.TableRow({ cantSplit: true, children: [
-        cell([para([run(d)]), para([run(`${r.e.start || '--:--'} - ${r.e.end || '--:--'}`)])], 0),
-        cell([para([run(r.staff || '')])], 1),
-        cell([para([run(r.kind)]), ...(kpText(r) ? [para([run(kpText(r), { size: 16, color: '444444' })])] : [])], 2),
-        cell(String(r.text || '').split('\n').map(t => para([run(t)])), 3),
-      ] });
+    const name = (state.name || '').trim(), flat = name.replace(/[\s　]+/g, '');
+    const kubun = document.getElementById('recKubun').value;
+    const FONT = window._docxFont || '游明朝';
+    const run = (text, bold, brk) => new D.TextRun({ text, bold, break: brk ? 1 : 0, font: { eastAsia: FONT, ascii: FONT, hAnsi: FONT }, size: 21 });
+    // 日付の早い順、同じ日は時刻順
+    const sorted = [...rows].sort((a, b) => (a.date - b.date) || (a.e.start || '').localeCompare(b.e.start || ''));
+    const days = []; sorted.forEach(r => { const k = ymd(r.date); const d = days.find(x => x.k === k); d ? d.rows.push(r) : days.push({ k, date: r.date, rows: [r] }); });
+    const children = [];
+    days.forEach((d, i) => {
+      const head = `${d.date.getMonth() + 1}月${d.date.getDate()}日（${DAYS[d.date.getDay()]}）`;
+      children.push(new D.Paragraph({ children: [run(head, true), ...(i === 0 ? [run(`　　　　　　　${flat}${kubun ? '　' + kubun : ''}`, true)] : [])] }));
+      d.rows.forEach(r => children.push(new D.Paragraph({ children: [run(`【${recLabel(r)}】`, true), run(String(r.text || '').replace(/\n/g, ''), false, true)] })));
+      if (i < days.length - 1) children.push(new D.Paragraph({ children: [] }));
     });
-    const doc = new D.Document({ sections: [{
-      properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1000, bottom: 1000, left: 850, right: 850 } } },
-      footers: { default: new D.Footer({ children: [para([run('訪問介護 すまいるわん　TEL 080-4135-4037', { size: 16, color: '444444' })], { align: D.AlignmentType.RIGHT })] }) },
-      children: [
-        para([run(`訪問記録　${name} 様`, { size: 32, bold: true })], { after: 60 }),
-        para([run(`期間：${from.replace(/-/g, '/')} 〜 ${to.replace(/-/g, '/')}　　${rows.length}件`, { size: 18 })], { after: 200 }),
-        new D.Table({ rows: [header, ...body], columnWidths: W, layout: D.TableLayoutType.FIXED, width: { size: W.reduce((a, b) => a + b, 0), type: D.WidthType.DXA } }),
-      ],
-    }] });
+    const doc = new D.Document({
+      styles: { default: { document: { run: { font: { eastAsia: FONT, ascii: FONT, hAnsi: FONT }, size: 21 } } } },
+      sections: [{ properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1985, right: 1701, bottom: 1701, left: 1701, header: 851, footer: 992 } } }, children }],
+    });
     const blob = await D.Packer.toBlob(doc);
-    await download(blob, `訪問記録_${name}_${from}〜${to}.docx`);
+    const m = sorted[0].date.getMonth() + 1;
+    await download(blob, `${kubun ? kubun + '　' : ''}${flat}${m}月特記事項.docx`);
   } catch (e) {
     alert('Wordを作成できませんでした: ' + ((e && e.message) || e));
   } finally { btn.disabled = false; btn.textContent = label; }
@@ -2336,6 +2342,7 @@ async function importPaper(input) {
   alert(`予定 ${res.count}件を読み取りました${res.name ? `（${res.name} 様）` : ''}。${nameMsg}\n読み間違いがないか右の用紙で確認・修正し、よければ「💾 保存」を押してください。\nそのあと「📝 訪問記録」タブで記録を作れます。`);
 }
 
+try { const kb = lsGet('smilewan_kubun'); if (kb !== null) document.getElementById('recKubun').value = kb; } catch {}
 refreshSavedList();
 render();
 initCloud();
