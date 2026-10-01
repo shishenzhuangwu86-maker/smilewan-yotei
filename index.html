@@ -912,7 +912,7 @@ async function saveRecords(opt = {}) {
 function refreshSavedMonths() {
   const sel = document.getElementById('recSavedMonth'); if (!sel) return;
   const name = (state.name || '').trim(), pre = docId(name || ' ') + '_';
-  const docs = Object.entries(getColl('records')).filter(([id]) => id.startsWith(pre)).map(([, d]) => d).sort((a, b) => b.month.localeCompare(a.month));
+  const docs = Object.entries(getColl('records')).filter(([id]) => id.startsWith(pre)).map(([, d]) => d).filter(d => d.rows && d.rows.length).sort((a, b) => b.month.localeCompare(a.month));
   sel.innerHTML = docs.length ? docs.map(d => `<option value="${esc(d.month)}">${esc(d.month.replace('-', '年'))}月（${d.rows.length}件）</option>`).join('') : '<option value="">（保存した記録はありません）</option>';
 }
 function openSavedRecords() {
@@ -1713,7 +1713,7 @@ const SG = {
   open: ['訪問時、本人へ声掛けすると落ち着いた様子で応答された。', '訪問時、本人へ挨拶すると穏やかに応答された。', '訪問時、本人は室内で落ち着いて過ごされていた。', '本人の起床状況を確認し、声掛けを行いながら様子を確認した。'],
   health: ['体調を確認したところ、特に訴えは聞かれなかった。', '体調面について確認し、不調の訴えはなかった。', '体調を確認し、表情も穏やかであった。'],
   dress: ['更衣について声掛けを行うと、本人が準備していた衣類への着替えを進められた。', '起床後の更衣を促し、本人自身で衣類を選んで着替えを行った。', '着替えや身支度について、必要な部分のみ支援し、本人ができる動作は見守った。', '更衣の声掛けを行うと自身で衣類を準備され、着替えを進められた。衣類の着脱時は転倒等に注意し見守った。'],
-  wash: ['洗面についても声掛けを行い、本人のペースで実施された。', '洗面も声掛けにて実施され、終了後の身だしなみを確認した。', '洗面についても声掛けを行い、必要な動作は本人主体で実施していただいた。'],
+  wash: ['洗面についても声掛けを行い、本人のペースで実施された。', '洗面も声掛けにて実施され、終了後の身だしなみを確認した。', '洗面についても声掛けを行い、終了後に身だしなみを一緒に確認した。'],
   toilet: ['トイレへの移動は見守り、必要な場面のみ声掛けと介助を行った。', '排泄は本人に行っていただき、必要時のみ声掛けで確認した。'],
   med: ['服薬について声掛けを行い、本人が確認できるよう支援した。', '服薬についても声掛け・確認を行った。', '服薬状況を確認し、飲み忘れがないよう声掛けした。'],
   respect: ['動作は急がず、本人のペースを尊重して支援した。', '必要以上に介助せず、本人ができる動作は見守りながら支援した。', '本人が可能な動作については急がせず見守った。', '本人のペースを大切にしながら支援した。'],
@@ -1727,7 +1727,7 @@ const SG = {
   shopping: ['必要な食品や日用品を本人と確認し、買い物代行を行った。購入品は本人に確認していただきながら収納した。'],
   bathOpen: ['訪問時、入浴について声掛けすると応じられた。', '入浴前に本人へ声掛けを行い、体調を確認して入浴準備を行った。', '本人の体調を確認してから、浴室の準備を行った。'],
   bathDress: ['更衣は本人に行っていただき、必要時のみ声掛けを実施した。', '更衣は本人主体で行っていただき、衣類の着脱時のみ必要に応じて見守った。'],
-  bathWash: ['洗身は本人ができる部分は自身で行っていただき、洗い忘れがないよう適宜確認した。', '洗身は本人が可能な範囲で行い、洗い残しについて声掛けを行った。'],
+  bathWash: ['洗身時は、背中など洗い忘れやすい部分を声掛けで確認した。', '洗身は本人が可能な範囲で行い、洗い残しについて声掛けを行った。'],
   bathSafe: ['浴槽内では本人のペースでゆっくり入浴されていたため、のぼせ等に注意して見守った。', '入浴中は安全確認を行いながら見守った。'],
   bathAfter: ['入浴後は水分摂取を促し、着衣まで確認して終了した。', '入浴後は水分補給を促した。'],
   say: {
@@ -1766,7 +1766,7 @@ function assessHints(row, who) {
   if (cleaning && /一緒|伝え|わからな/.test(inote('清掃'))) care.push(K ? '掃除は声掛けをしながら一緒に行った。' : '掃除は手順を伝えながら、本人と一緒に行った。');
   else if (cleaning && /一部|支援|苦手|困難/.test(inote('清掃'))) care.push(K ? '掃除の難しい部分を支援した。' : '掃除は苦手な部分を支援しながら、本人と一緒に行った。');
   if (cooking && /簡単な調理|温め|レンジ/.test(inote('調理'))) care.push(K ? '温めなどできる作業は利用者様に行っていただいた。' : '温めや簡単な作業は本人に行っていただき、調理を支援した。');
-  if (morning && /声掛け|促し/.test(inote('洗顔'))) care.push(K ? '洗顔・歯磨きは声掛けで促した。' : '洗顔・歯磨きは声掛けで促し、本人に行っていただいた。');
+  if (morning && /声掛け|促し/.test((inote('洗顔') || inote('洗面')))) care.push(K ? '洗面・歯磨きは声掛けで促した。' : '洗面・歯磨きは声掛けで促し、本人に行っていただいた。');
   if (kp.includes('起床・就寝|起床介助') && /苦手|ばらつき|起きれ|眠れ|不眠|介助/.test(inote('起床'))) care.push('起床は無理のないよう、声掛けをしながら本人のペースで促した。');
   H.care = care.slice(0, 2).join('');
   // ③ 服薬：飲み忘れがある人は毎回
@@ -1790,7 +1790,33 @@ function assessHints(row, who) {
 function dayCtx(row) {
   const k = ymd(row.date), st = row.e.start || '';
   const prev = recRows.filter(r => r !== row && ymd(r.date) === k && (r.e.start || '') < st);
-  return { first: !prev.length, hadWake: prev.some(r => kpOf(r).includes('起床・就寝|起床介助')), hadBath: prev.some(r => /入浴/.test(r.e.type || '') || kpOf(r).some(x => x.startsWith('入浴・清拭|'))) };
+  const todOf = r => shogaiTod(parseInt(r.e.start || '12', 10)), t = todOf(row);
+  return { med: prev.some(r => /服薬/.test(r.text || '') && todOf(r) === t), first: !prev.length, hadWake: prev.some(r => kpOf(r).includes('起床・就寝|起床介助')), hadBath: prev.some(r => /入浴/.test(r.e.type || '') || kpOf(r).some(x => x.startsWith('入浴・清拭|'))) };
+}
+// 同じことを何回も書かない：直近の記録に出た文は避ける
+let _curRow = null;
+function recentTxt(n) { const i = recRows.indexOf(_curRow); return (i < 0 ? recRows : recRows.slice(0, i)).slice(-n).map(r => r.text || '').join(''); }
+function sameDayTxt() { const k = ymd(_curRow.date); return recRows.filter(r => r !== _curRow && ymd(r.date) === k).map(r => r.text || '').join(''); }
+function pickF(arr) {
+  const t = recentTxt(6), d = sameDayTxt(), f = arr.filter(x => !t.includes(x)), g = arr.filter(x => !d.includes(x));
+  return pick(f.length ? f : g.length ? g : arr);  // 直近で使っていない文 → 同じ日に使っていない文 の順で選ぶ
+}
+const seen = x => recentTxt(4).includes(x);
+// その日のうちに既に書いた文は、アセスの配慮文でも繰り返さない
+function freshDay(t) { if (!t) return ''; const d = sameDayTxt(); return t.split('。').filter(x => x && !d.includes(x)).map(x => x + '。').join(''); }
+// 同じ意味の文が並ばないように：付け足しの文（様子・配慮・締めなど）は、前に同じ意味の文があれば外す
+const MEAN = [/体調|気分|表情|訴え/, /穏やか|落ち着/, /本人ができる|できる部分|できるところ|必要以上に介助せず|本人主体|本人に行っていただ|ご自身で行っていただ|自分のことは自分で|自立|本人と一緒に|利用者様と一緒に/,
+  /ペース|急が|ゆっくり/, /傾聴|不安/, /転倒|ふらつき|安全|足元/, /服薬|飲み忘れ/, /会話/];
+let _opt = new Set();
+const o = x => { if (x) x.split('。').filter(Boolean).forEach(y => _opt.add(y)); return x; };
+function tidy(arr) {
+  const out = [], used = new Set();
+  for (const x of arr.join('').split('。').filter(Boolean)) {
+    const plain = x.replace(/「[^」]*」/g, ''), tags = MEAN.map((re, i) => re.test(plain) ? i : -1).filter(i => i >= 0);
+    if (_opt.has(x) && tags.some(i => used.has(i))) continue;
+    tags.forEach(i => used.add(i)); out.push(x + '。');
+  }
+  _opt = new Set(); return out.join('');
 }
 const SG_OPEN = {
   朝: ['訪問時、本人へ声掛けすると落ち着いた様子で応答された。', '訪問時、本人へ挨拶すると穏やかに応答された。', '本人の起床状況を確認し、声掛けを行いながら様子を確認した。', '朝の訪問時、本人は室内で落ち着いて過ごされていた。'],
@@ -1801,8 +1827,8 @@ const SG_OPEN = {
 const SG_FOLLOW = { 昼: ['午前中の様子を伺い、体調を確認した。', '前回の訪問からの様子を伺い、体調を確認した。'], 夕方: ['日中の過ごし方を伺い、体調を確認した。'], 夜: ['日中の過ごし方を伺い、体調を確認した。', '夕食後の様子を伺い、体調を確認した。'] };
 const SG_SAY = {
   朝: ['本人から「ありがとう」と発言あり、落ち着いて過ごされていた。', '本人から「朝は少しゆっくりしたい」と話があった。'],
-  昼: ['本人から「ありがとう」と発言あり、落ち着いて過ごされていた。'],
-  夕方: ['本人から「ありがとう」と発言あり、落ち着いて過ごされていた。'],
+  昼: ['本人から「ありがとう」と発言あり、落ち着いて過ごされていた。', '本人から「午後はゆっくり過ごします」と話があった。', '本人から「助かります」と発言あり、穏やかに過ごされていた。'],
+  夕方: ['本人から「ありがとう」と発言あり、落ち着いて過ごされていた。', '本人から「今日は落ち着いて過ごせた」と話があった。'],
   夜: ['本人から「今日はゆっくり休みます」と話があった。', '本人から「ありがとう、おやすみなさい」と発言あり。'],
 };
 const TK_OPEN = {
@@ -1812,7 +1838,8 @@ const TK_OPEN = {
 };
 const TK_FOLLOW = { 昼: ['午前中の様子を伺い、利用者様の体調を確認した。'], 夜: ['日中の過ごし方を伺い、利用者様の体調を確認した。', '夜の訪問時、日中の様子を伺い体調を確認した。'] };
 function genShogai(row) {
-  const AH = assessHints(row, '本人');
+  _curRow = row; _opt = new Set(); const ctx = dayCtx(row);
+  const AH = assessHints(row, '本人'); AH.care = freshDay(AH.care); AH.life = freshDay(AH.life); AH.observe = freshDay(AH.observe);
   const kp = kpOf(row), has = k => kp.includes(k), hasC = c => kp.some(k => k.startsWith(c + '|'));
   const h = parseInt(row.e.start || '12', 10), tod = shogaiTod(h);
   const meal = ((row.e.detail || '').match(/朝食|昼食|夕食/) || [h < 11 ? '朝食' : h < 16 ? '昼食' : '夕食'])[0];
@@ -1821,38 +1848,41 @@ function genShogai(row) {
   let cat = '身体';
   if (/入浴/.test(row.e.type || '') || (hasC('入浴・清拭') && !hasC('起床・就寝'))) {
     cat = '入浴';
-    s.push(pick(SG.bathOpen), pick(SG.bathDress), pick(SG.bathWash), pick(SG.bathSafe), pick(SG.bathAfter));
+    s.push(pickF(SG.bathOpen), pickF(SG.bathDress), pickF(SG.bathWash), pickF(SG.bathSafe), pickF(SG.bathAfter));
   } else if (row.kind === '家事援助') {
     cat = '家事';
-    if (hasC('調理') || /朝食|昼食|夕食|調理|食事/.test(row.e.detail || '')) s.push(pick(SG.meal(meal)), pick(SG.mealMore), pick(SG.mealAfter));
-    if (hasC('清掃')) s.push(pick(SG.clean), ...(s.length < 2 ? [pick(SG.cleanMore)] : []));
-    if (hasC('洗濯')) s.push(pick(SG.laundry));
-    if (hasC('買物等')) s.push(pick(SG.shopping));
-    if (!s.length) s.push(pick(SG.clean), pick(SG.cleanMore));
-    if (has('服薬・医療|服薬介助・確認') || /服薬/.test(row.e.detail || '')) s.push(pick(SG.med));
+    if (hasC('調理') || /朝食|昼食|夕食|調理|食事/.test(row.e.detail || '')) s.push(pickF(SG.meal(meal)), pickF(SG.mealMore), pickF(SG.mealAfter));
+    if (hasC('清掃')) s.push(pickF(SG.clean), ...(s.length < 2 ? [pickF(SG.cleanMore)] : []));
+    if (hasC('洗濯')) s.push(pickF(SG.laundry));
+    if (hasC('買物等')) s.push(pickF(SG.shopping));
+    if (!s.length) s.push(pickF(SG.clean), pickF(SG.cleanMore));
+    if (!ctx.med && (has('服薬・医療|服薬介助・確認') || /服薬/.test(row.e.detail || ''))) s.push(pickF(SG.med));
   } else {
-    const ctx = dayCtx(row), late = tod === '夕方' || tod === '夜';
-    if (!ctx.first && SG_FOLLOW[tod]) s.push(pick(SG_FOLLOW[tod])); else s.push(pick(SG_OPEN[tod] || SG.open), pick(SG.health));
-    if (AH.observe) s.push(AH.observe);
-    if (has('起床・就寝|就寝介助') || (late && has('身体整容|更衣介助'))) s.push(pick(SG.night));
-    else if (((has('起床・就寝|起床介助') && !ctx.hadWake) || has('身体整容|更衣介助')) && !/着替え/.test(AH.care)) s.push(pick(SG.dress.filter(x => tod === '朝' || !/起床/.test(x))));
+    const late = tod === '夕方' || tod === '夜';
+    if (!ctx.first && SG_FOLLOW[tod]) s.push(pickF(SG_FOLLOW[tod])); else { const op = pickF(SG_OPEN[tod] || SG.open); s.push(op); if (!AH.observe) s.push(pickF(SG.health.filter(x => !(/穏やか|落ち着/.test(op) && /穏やか|落ち着/.test(x))))); }
+    if (AH.observe && !seen(AH.observe)) s.push(o(AH.observe));
+    if (has('起床・就寝|就寝介助') || (late && has('身体整容|更衣介助'))) s.push(pickF(SG.night));
+    else if (((has('起床・就寝|起床介助') && !ctx.hadWake) || has('身体整容|更衣介助')) && !/着替え/.test(AH.care)) s.push(pickF(SG.dress.filter(x => tod === '朝' || !/起床/.test(x))));
     const oral = has('身体整容|口腔ケア'), dentS = assessOf((state.name || '').trim())?.dentures;
-    if (has('身体整容|整容') || has('身体整容|洗面') || has('起床・就寝|起床介助')) s.push(oral ? `洗面・${dentS ? '義歯の洗浄・' : ''}口腔ケアについても声掛けを行い、本人のペースで実施された。` : pick(SG.wash));
+    const washAH = /洗面|洗顔/.test(AH.care);  // 洗面と洗顔は同じ。アセスの文があれば重ねない
+    if (washAH) {}
+    else if (has('身体整容|整容') || has('身体整容|洗面') || has('起床・就寝|起床介助')) s.push(oral ? `洗面・${dentS ? '義歯の洗浄・' : ''}口腔ケアについても声掛けを行い、本人のペースで実施された。` : pickF(SG.wash));
     else if (oral) s.push(dentS ? '義歯の洗浄・口腔ケアについて声掛けし、本人ができる部分は自身で行っていただいた。' : '口腔ケアについて声掛けし、本人のペースで実施された。');
-    if (hasC('排泄')) s.push(pick(SG.toilet));
-    if (hasC('自立支援')) s.push(pick(['片付けは本人と一緒に行い、できるところは自身で取り組んでいただいた。', '片付けの手順を声掛けで確認しながら、本人と一緒に行った。']));
-    if (AH.care) s.push(AH.care);
-    if (has('服薬・医療|服薬介助・確認')) s.push(AH.med || pick(SG.med));
-    s.push(pick(SG.respect));
+    if (hasC('排泄')) s.push(pickF(SG.toilet));
+    if (hasC('自立支援')) s.push(pickF(['片付けは本人と一緒に行い、できるところは自身で取り組んでいただいた。', '片付けの手順を声掛けで確認しながら、本人と一緒に行った。']));
+    if (AH.care) s.push(o(AH.care));
+    if (!ctx.med && has('服薬・医療|服薬介助・確認')) s.push(AH.med && !seen(AH.med) ? AH.med : pickF(SG.med));
+    if (!(AH.life && !seen(AH.life)) && !/急が|ペース|ゆっくり/.test(AH.care)) s.push(o(pickF(SG.respect)));  // 同じ意味の文は重ねない  // 自立の希望の文と同じ意味なので片方だけ
   }
   const AL = AH;
-  if (cat === '入浴' && AL.care) s.push(AL.care);
-  if (cat === '家事' && AL.med && /服薬/.test(s.join(''))) { /* 服薬の文は既にある */ } else if (cat === '家事' && AL.med) s.push(AL.med);
-  if (AL.life) s.push(AL.life);
-  if (sayOn && Math.random() < 0.5) s.push(pick(cat === '身体' ? (SG_SAY[tod] || SG.say.身体) : SG.say[cat])); else if (Math.random() < 0.6) s.push(pick(SG.mood));
-  return s.join('');
+  if (cat === '入浴' && AL.care) s.push(o(AL.care));
+  if (cat === '家事' && AL.med && /服薬/.test(s.join(''))) { /* 服薬の文は既にある */ } else if (cat === '家事' && AL.med && !ctx.med) s.push(AL.med);
+  if (AL.life && cat !== '入浴' && !seen(AL.life)) s.push(o(AL.life));
+  if (sayOn && Math.random() < 0.5) s.push(o(pickF(cat === '身体' ? (SG_SAY[tod] || SG.say.身体) : SG.say[cat]))); else if (Math.random() < 0.6) s.push(o(pickF(SG.mood)));
+  return tidy(s);
 }
 function genTokki(row) {
+  _curRow = row; _opt = new Set();
   if (kubunOf((state.name || '').trim()) !== '介護') return genShogai(row);
   const kubun = kubunOf((state.name || '').trim()) === '介護' ? '介護' : '障害', K = kubun === '介護';
   const kp = kpOf(row), has = k => kp.includes(k), hasC = c => kp.some(k => k.startsWith(c + '|'));
@@ -1861,25 +1891,25 @@ function genTokki(row) {
   const a = assessOf((state.name || '').trim()), dent = a && a.dentures;
   const sayOn = document.getElementById('recSay') ? document.getElementById('recSay').checked : true;
   const ctx = dayCtx(row);
-  const s = [(!ctx.first && TK_FOLLOW[tod]) ? pick(TK_FOLLOW[tod]) : pick(TK_OPEN[tod] || TK.open)];
-  const AH = assessHints(row, '利用者様'); if (AH.observe) s.push(AH.observe);
+  const s = [(!ctx.first && label === '入浴') ? pickF(['前回の訪問からの様子を伺った。', '日中の過ごし方について話を伺った。']) : (!ctx.first && TK_FOLLOW[tod]) ? pickF(TK_FOLLOW[tod]) : pickF(TK_OPEN[tod] || TK.open)];
+  const AH = assessHints(row, '利用者様'); AH.care = freshDay(AH.care); AH.life = freshDay(AH.life); AH.observe = freshDay(AH.observe); if (AH.observe && !seen(AH.observe)) s.push(o(AH.observe));
   let cat = tod;
   if (label === '入浴') {
     cat = '入浴';
-    s.push(K ? pick(['入浴前に排泄を済ませ、体調を確認してから入浴介助を実施した。', '入浴前の体調を確認し、利用者様へ声掛けをしてから入浴介助を行った。'])
-             : pick(['入浴前に体調を確認し、入浴の準備を利用者様と一緒に行った。', '入浴の手順を声掛けで確認しながら、入浴の準備を一緒に行った。']));
-    s.push(K ? pick(['ヘルパーが更衣、浴室までの移動、洗身、洗髪、入浴後の着衣まで必要な介助を行った。', 'ヘルパーが浴室までの移動、更衣、洗身、洗髪、浴槽への出入り、入浴後の着衣まで介助した。'])
-             : pick(['洗身・洗髪は利用者様ができる部分はご自身で行っていただき、背中など難しい部分のみ支援した。', '更衣や洗身はできる部分をご自身で行っていただき、洗い残しがないよう声掛けをしながら見守った。']));
-    s.push(pick(['浴室内では足元に注意し、安全を確認しながら支援した。', '浴室内での転倒予防に配慮した。']) + (K ? '入浴後は水分補給を促した。' : '入浴後の着替えも、できる部分はご自身で行っていただいた。'));
+    s.push(K ? pickF(['入浴前に排泄を済ませ、体調を確認してから入浴介助を実施した。', '入浴前の体調を確認し、利用者様へ声掛けをしてから入浴介助を行った。'])
+             : pickF(['入浴前に体調を確認し、入浴の準備を利用者様と一緒に行った。', '入浴の手順を声掛けで確認しながら、入浴の準備を一緒に行った。']));
+    s.push(K ? pickF(['ヘルパーが更衣、浴室までの移動、洗身、洗髪、入浴後の着衣まで必要な介助を行った。', 'ヘルパーが浴室までの移動、更衣、洗身、洗髪、浴槽への出入り、入浴後の着衣まで介助した。'])
+             : pickF(['洗身・洗髪は利用者様ができる部分はご自身で行っていただき、背中など難しい部分のみ支援した。', '更衣や洗身はできる部分をご自身で行っていただき、洗い残しがないよう声掛けをしながら見守った。']));
+    s.push(pickF(['浴室内では足元に注意し、安全を確認しながら支援した。', '浴室内での転倒予防に配慮した。']) + (K ? '入浴後は水分補給を促した。' : '入浴後の着替えも、できる部分はご自身で行っていただいた。'));
   } else if (row.kind === '家事援助') {
     cat = '家事';
     const jobs = [];
-    if (hasC('清掃')) jobs.push(K ? pick(['ヘルパーが居室内の掃除を行い、生活スペースを整えた。', '床面や生活スペースの掃除を行い、清潔な環境を整えた。'])
-                                  : pick(['掃除は利用者様と一緒に行い、できるところはご自身で取り組んでいただいた。', '掃除の場所を一緒に確認し、利用者様ができる部分はご自身で行っていただいた。']));
-    if (hasC('洗濯')) jobs.push(K ? pick(['洗濯物を確認して洗濯を行い、衣類を整理した。', '洗濯を行い、乾いた衣類を畳んで収納した。'])
-                                  : pick(['洗濯物は一緒に畳み、収納場所を確認しながら整理した。', '洗濯機の操作を声掛けで確認しながら、ご自身で行っていただいた。']));
-    if (hasC('買物等')) jobs.push(K ? pick(['必要な食品や日用品を確認して買い物代行を行い、購入品を所定の場所へ収納した。', '買い物代行では必要な食品・日用品を購入し、帰宅後に収納まで行った。'])
-                                    : pick(['買う物を利用者様と一緒に考えてメモにまとめ、買い物代行後は購入品の整理を一緒に行った。', '必要な物を一緒に確認し、購入後はお釣りとレシートをご自身で確認していただいた。']));
+    if (hasC('清掃')) jobs.push(K ? pickF(['ヘルパーが居室内の掃除を行い、生活スペースを整えた。', '床面や生活スペースの掃除を行い、清潔な環境を整えた。'])
+                                  : pickF(['掃除は利用者様と一緒に行い、できるところはご自身で取り組んでいただいた。', '掃除の場所を一緒に確認し、利用者様ができる部分はご自身で行っていただいた。']));
+    if (hasC('洗濯')) jobs.push(K ? pickF(['洗濯物を確認して洗濯を行い、衣類を整理した。', '洗濯を行い、乾いた衣類を畳んで収納した。'])
+                                  : pickF(['洗濯物は一緒に畳み、収納場所を確認しながら整理した。', '洗濯機の操作を声掛けで確認しながら、ご自身で行っていただいた。']));
+    if (hasC('買物等')) jobs.push(K ? pickF(['必要な食品や日用品を確認して買い物代行を行い、購入品を所定の場所へ収納した。', '買い物代行では必要な食品・日用品を購入し、帰宅後に収納まで行った。'])
+                                    : pickF(['買う物を利用者様と一緒に考えてメモにまとめ、買い物代行後は購入品の整理を一緒に行った。', '必要な物を一緒に確認し、購入後はお釣りとレシートをご自身で確認していただいた。']));
     if (hasC('調理')) jobs.push(K ? `${meal}の準備を行い、配膳・片付けまで行った。` : `${meal}の調理は手順を声掛けしながら一緒に行った。`);
     if (!jobs.length) jobs.push(K ? 'ヘルパーが必要な家事援助を行い、生活環境を整えた。' : '家事の手順を一緒に確認し、利用者様ができる部分はご自身で行っていただいた。');
     s.push(...jobs.slice(0, 3));
@@ -1892,33 +1922,34 @@ function genTokki(row) {
     if (has('起床・就寝|起床介助') && !ctx.hadWake && tod === '朝') acts.push('起床');
     if (hasC('排泄')) acts.push(K ? 'トイレへの移動・排泄介助' : 'トイレへの移動');
     if (has('身体整容|更衣介助') || has('起床・就寝|起床介助') || has('起床・就寝|就寝介助')) acts.push('更衣');
-    if (has('身体整容|整容') || has('身体整容|洗面')) acts.push(K ? '整容' : '洗面・整容');
-    if (has('身体整容|口腔ケア')) acts.push(dent ? '義歯の洗浄・口腔ケア' : '口腔ケア');
+    const washAH = /洗面|洗顔/.test(AH.care);  // 洗面と洗顔は同じ。アセスの文があれば重ねない
+    if (!washAH && (has('身体整容|整容') || has('身体整容|洗面'))) acts.push(K ? '整容' : '洗面・整容');
+    if (!washAH && has('身体整容|口腔ケア')) acts.push(dent ? '義歯の洗浄・口腔ケア' : '口腔ケア');
     if (has('起床・就寝|就寝介助')) acts.push('就寝の準備');
     if (acts.length || !hasC('自立支援')) s.push(K
       ? (acts.length ? `ヘルパーが${acts.join('、')}を行った。` : 'ヘルパーが必要な身体介助を行った。')
       : (acts.length ? `${acts.join('、')}は、利用者様ができる部分はご自身で行っていただき、難しい部分のみ支援した。` : '利用者様ができることはご自身で行っていただき、必要な部分のみ支援した。'));
-    if (hasC('排泄')) s.push(K ? pick(['排泄後は清潔保持を行い、身だしなみを整えた。', '移動時は転倒に注意し、必要な部分を支えながら介助した。'])
-                               : pick(['トイレまでの移動は見守り、必要な場面のみ介助した。', '排泄はご自身で行っていただき、後始末を声掛けで確認した。']));
-    if (AH.care) s.push(AH.care);
-    if (has('服薬・医療|服薬介助・確認')) s.push(K ? (AH.med || '服薬を確認し、飲み忘れがないようにした。') : '服薬はご自身で行っていただき、飲んだことを一緒に確認した。');
+    if (hasC('排泄')) s.push(K ? pickF(['排泄後は清潔保持を行い、身だしなみを整えた。', '移動時は転倒に注意し、必要な部分を支えながら介助した。', '排泄後の陰部の清潔を確認し、衣類を整えた。', 'トイレまでの移動は足元に注意しながら付き添った。', '排泄の状態を確認し、後始末まで行った。'])
+                               : pickF(['トイレまでの移動は見守り、必要な場面のみ介助した。', '排泄はご自身で行っていただき、後始末を声掛けで確認した。']));
+    if (AH.care) s.push(o(AH.care));
+    if (!ctx.med && has('服薬・医療|服薬介助・確認')) s.push(K ? (AH.med && !seen(AH.med) ? AH.med : pickF([`${tod === '朝' ? '朝' : tod === '昼' ? '昼' : '夕'}の薬を確認し、飲み忘れがないようにした。`, `${tod === '朝' ? '朝食後' : tod === '昼' ? '昼食後' : '夕食後'}の服薬を確認した。`, `${tod === '朝' ? '朝' : tod === '昼' ? '昼' : '夜'}の服薬について確認し、飲み忘れのないようにした。`])) : '服薬はご自身で行っていただき、飲んだことを一緒に確認した。');
     // 共に行う（自立支援）
     if (hasC('自立支援')) {
       const it = kp.filter(k => k.startsWith('自立支援|')).map(k => k.split('|')[1]);
       const what = it.includes('掃除') ? (/片付/.test(row.e.detail || '') ? '片付け' : '掃除') : it.includes('洗濯') ? '洗濯' : it.includes('一般的な調理・配下膳') ? '調理' : it.includes('買い物・薬の受け取り') ? '買い物' : '身の回りのこと';
-      s.push(pick([`${what}は利用者様と一緒に行い、できるところはご自身で取り組んでいただいた。`, `${what}の手順を声掛けで確認しながら、利用者様と一緒に行った。`]));
+      s.push(pickF([`${what}は利用者様と一緒に行い、できるところはご自身で取り組んでいただいた。`, `${what}の手順を声掛けで確認しながら、利用者様と一緒に行った。`]));
     }
     if (!mealFirst && (/生活|家事/.test(row.e.type || '') || ['調理', '清掃', '洗濯', '買物等'].some(hasC))) {
       if (/朝食|昼食|夕食|提供|準備/.test(row.e.detail || '') || hasC('調理')) s.push(K ? `${meal}の準備・配膳を行った。` : `${meal}の準備は手順を声掛けしながら一緒に行った。`);
-      else s.push(K ? pick(['生活に必要な準備を行い、室内を整えた。', '過ごしやすいよう生活環境を整えた。']) : '身の回りの整理は、利用者様と一緒に行った。');
+      else s.push(K ? pickF(['生活に必要な準備を行い、室内を整えた。', '過ごしやすいよう生活環境を整えた。']) : '身の回りの整理は、利用者様と一緒に行った。');
     }
   }
   // ⑤ アセスメントの配慮（1文だけ）
-  if (label === '入浴' && AH.care) s.push(AH.care);
-  if (AH.life) s.push(AH.life);
+  if (label === '入浴' && AH.care) s.push(o(AH.care));
+  if (AH.life && label !== '入浴' && !seen(AH.life)) s.push(o(AH.life));
   // ⑥ 様子・言葉
-  s.push(sayOn && Math.random() < 0.7 ? `利用者様は「${pick(TK.say[kubun][cat] || TK.say[kubun][tod])}」と話されていた。` : pick(TK.mood[kubun]));
-  return s.join('');
+  s.push(o(sayOn && Math.random() < 0.7 ? `利用者様は「${pickF(TK.say[kubun][cat] || TK.say[kubun][tod])}」と話されていた。` : pickF(TK.mood[kubun])));
+  return tidy(s);
 }
 function genText(row) {
   if (document.querySelector('input[name=recStyle]:checked').value === 'tokki') {
@@ -1926,12 +1957,12 @@ function genText(row) {
   }
   const bank = document.querySelector('input[name=recStyle]:checked').value === 'short' ? SHORT : PB;
   const tags = tagsFor(rowE(row), row.kind);
-  let t = pick(bank.冒頭) + tags.map(k => pick(bank[k] || PB[k] || [])).join('');
+  let t = pickF(bank.冒頭) + tags.map(k => pickF(bank[k] || PB[k] || [])).join('');
   // 選んだ実施内容のうち、文例に当てはまらないもの（例:「（生活3）」以外の独自の内容）は、そのまま一文にする
   detailLines(rowE(row).detail).forEach(v => { if (itemUnmapped(v)) t += `${v.replace(/^[（(]|[）)]$/g, '')}を行った。`; });
   kpOf(row).forEach(k => { if (KP_SENT[k]) t += KP_SENT[k]; });
   const as = assessSentences(row); t = as.fix(t) + as.add;
-  if (document.getElementById('recClosing').checked && !globStates.size && Math.random() < 0.35) t += pick(bank.締め);
+  if (document.getElementById('recClosing').checked && !globStates.size && Math.random() < 0.35) t += pickF(bank.締め);
   return t;
 }
 function fmtKaipoke(d, e) {
@@ -2003,7 +2034,7 @@ function ensureSentences(t, row) {
     if (!hasOpener) bank.冒頭.filter(Boolean).forEach(v => pool.push({ v, where: 'start' }));
     const cand = pool.filter(c => c.v && !ngHits(c.v).length && !sentences(c.v).some(x => have.has(x)));
     if (!cand.length) break;
-    const c = pick(cand);
+    const c = pickF(cand);
     t = c.where === 'start' ? c.v + t : t + c.v;
   }
   return t;
