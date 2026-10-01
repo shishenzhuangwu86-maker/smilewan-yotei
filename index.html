@@ -179,6 +179,7 @@
   .rec-add { width: 100%; font: inherit; font-size: 11px; padding: 2px 5px; margin-top: 3px; border: 1px dashed var(--line); border-radius: 4px; background: transparent; color: var(--text); }
   @media print { .rec-items button { display: none; } }
   body.mode-record .paper-scroll, body.mode-help .paper-scroll { display: none; }
+  #syncBanner { background: var(--dup-alert-bg); color: var(--dup-alert-text); border: 1px solid var(--dup-alert-line); border-radius: 6px; padding: 8px 10px; margin: 0 0 10px; font-size: 13px; font-weight: bold; }
   #helpView { width: 100%; max-width: 900px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; line-height: 1.7; }
   #helpView h2 { margin: 0 0 6px; font-size: 20px; }
   #helpView h3 { margin: 22px 0 6px; font-size: 16px; border-left: 4px solid var(--accent); padding-left: 8px; scroll-margin-top: 12px; }
@@ -202,6 +203,7 @@
 <div class="app">
   <div class="editor">
     <h1>週間予定表 作成ツール <span id="syncStatus" class="sync local" onclick="changePass()" title="（Supabase版）クリックで合言葉を変更">💾 この端末に保存</span></h1>
+    <div id="syncBanner" style="display:none">⚠ 共有に接続されていません。今の入力はこの端末にだけ保存され、ほかの人には届きません。 <button class="small" onclick="changePass()">合言葉を入力して接続</button></div>
     <div class="mode-tabs">
       <button id="modeSheetBtn" class="active" onclick="setMode('sheet')">📅 予定表</button>
       <button id="modeRecordBtn" onclick="setMode('record')">📝 訪問記録</button>
@@ -279,7 +281,7 @@
         <button id="docxBtn" onclick="exportRecordsDocx()">Word書き出し</button>
         <button id="pdfBtn" onclick="exportRecordsPdf()">PDF保存</button>
         <button onclick="saveRecords()">💾 記録を保存</button>
-        <button onclick="if(dupConfirm())window.print()">🖨 印刷</button>
+        <button onclick="if(dupConfirm()){saveRecords({quiet:true});window.print()}">🖨 印刷</button>
         <button onclick="if(event.shiftKey)paperSelfTest();else document.getElementById('paperFile').click()">📄 紙(PDF)から取込</button>
       </div>
       <input type="file" id="paperFile" accept="application/pdf,image/*" style="display:none" onchange="importPaper(this)">
@@ -351,8 +353,8 @@
         <li>左上に「☁ 共有保存（予定表 ○名）」と出れば準備完了</li>
       </ol>
       <ul>
-        <li>保存した予定表・利用者情報・訪問記録は全員で共有されます。ほかの人の変更は30秒ほどで自分の画面にも出ます</li>
-        <li>左上が「💾 この端末に保存…」のときは共有されていません。その表示を押して合言葉を入れ直し、再読み込みしてください</li>
+        <li>予定表と訪問記録は、入力すると自動で保存されます（「💾 保存」を押し忘れても大丈夫）。保存した内容は全員で共有され、ほかの人の変更は30秒ほどで自分の画面にも出ます</li>
+        <li>画面の上に赤い帯「共有に接続されていません」が出たら、ほかの人に届いていません。帯の「合言葉を入力して接続」を押してください。つながると、それまでの入力も自動で共有されます</li>
         <li>LINE などのアプリの中で開くと動かないことがあります。「ブラウザで開く」を選んでください</li>
       </ul>
 
@@ -493,7 +495,10 @@ function lsSet(k, v) { try { localStorage.setItem(k, v); } catch { _mem[k] = v; 
 let DB = null;                       // claude.use('db') の結果
 const cloud = { schedules: null, settings: {} }; // db から届いた最新の内容
 function docId(name) { return btoa(unescape(encodeURIComponent(name))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
-function setSyncStatus(text, cls) { const el = document.getElementById('syncStatus'); if (el) { el.textContent = text; el.className = 'sync ' + (cls || ''); } }
+function setSyncStatus(text, cls) {
+  const el = document.getElementById('syncStatus'); if (el) { el.textContent = text; el.className = 'sync ' + (cls || ''); }
+  const b = document.getElementById('syncBanner'); if (b) b.style.display = (supaOn() && cls === 'local') ? '' : 'none';
+}
 function localStore() { try { return JSON.parse(lsGet(STORAGE_KEY) || '{}'); } catch { return {}; } }
 function getStore() { return (DB && cloud.schedules) ? cloud.schedules : localStore(); }
 async function dbWrite(fn, what) {
@@ -507,7 +512,7 @@ async function dbWrite(fn, what) {
   }
 }
 async function saveSchedule(name, data, opt = {}) {
-  const ls = localStore(); ls[name] = data; lsSet(STORAGE_KEY, JSON.stringify(ls));
+  const ls = localStore(); ls[name] = { ...data, updatedAt: new Date().toISOString() }; lsSet(STORAGE_KEY, JSON.stringify(ls));
   if (!opt.skipSb) sbPush('schedule', name, { name, days: data.days });
   if (DB) return dbWrite(() => DB.doc('schedules/' + docId(name)).set({ name, days: data.days, updatedAt: new Date().toISOString() }), '共有保存');
   return true;
@@ -586,7 +591,8 @@ async function initCloud() {
     cloud.schedules = m;
     // 共有側にまだ無く、この端末だけにある予定表は自動で共有側へ送る（初回移行）
     const ls = localStore();
-    Object.keys(ls).forEach(n => { if (!m[n] && !cloud._migrated) DB.doc('schedules/' + docId(n)).set({ name: n, days: ls[n].days, updatedAt: new Date().toISOString() }).catch(() => {}); });
+    // この端末にだけある予定表・この端末の方が新しい予定表は、共有側へ送る（つながっていない間の変更を取りこぼさない）
+    if (!cloud._migrated) Object.keys(ls).forEach(n => { const l = ls[n], c = m[n]; if (!c || (l.updatedAt && (!c.updatedAt || l.updatedAt > c.updatedAt))) { m[n] = { name: n, days: l.days, updatedAt: l.updatedAt }; DB.doc('schedules/' + docId(n)).set({ name: n, days: l.days, updatedAt: l.updatedAt || new Date().toISOString() }).catch(() => {}); } });
     cloud._migrated = true;
     refreshSavedList(); refreshUserPick(); if (mode === 'record') refreshRecUsers();
     setSyncStatus(`☁ 共有保存（予定表 ${Object.keys(m).length}名）`, 'ok');
@@ -601,7 +607,7 @@ async function initCloud() {
     let first = true;
     DB.collection(kind).onSnapshot(snap => {
       const m = {}; snap.docs.forEach(d => { m[d.id] = d.data(); });
-      if (first) { first = false; const l = localColl(kind); Object.keys(l).forEach(id => { if (!m[id]) { m[id] = l[id]; DB.doc(kind + '/' + id).set(l[id]).catch(() => {}); } }); }
+      if (first) { first = false; const l = localColl(kind); Object.keys(l).forEach(id => { const c = m[id], x = l[id]; if (!c || (x.updatedAt && (!c.updatedAt || x.updatedAt > c.updatedAt))) { m[id] = x; DB.doc(kind + '/' + id).set(x).catch(() => {}); } }); }
       cloud[kind] = m;
       if (kind === 'clients') { renderClientBox(!clientEdited); renderNgBox(); renderAssessBox(); renderGlobStates(); if (recRows.length) renderRecordView(); } else refreshSavedMonths();
     }, () => {});
@@ -802,6 +808,7 @@ function csvClientInfo(r, heads) {
 function localColl(kind) { try { return JSON.parse(lsGet('smilewan_' + kind) || '{}'); } catch { return {}; } }
 function getColl(kind) { return (DB && cloud[kind]) ? cloud[kind] : localColl(kind); }
 async function putDoc(kind, id, data) {
+  data = { ...data, updatedAt: data.updatedAt || new Date().toISOString() };
   const l = localColl(kind); l[id] = data; lsSet('smilewan_' + kind, JSON.stringify(l));
   if (DB) { cloud[kind] = { ...(cloud[kind] || {}), [id]: data }; return dbWrite(() => DB.doc(kind + '/' + id).set(data), '共有保存'); }
   return true;
@@ -836,11 +843,12 @@ async function saveClientInfo() {
 }
 // 訪問記録: 利用者×月 ごとに1件（同じ日時の行は上書き）
 const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-async function saveRecords() {
+async function saveRecords(opt = {}) {
+  clearTimeout(recTimer);
   const name = (state.name || '').trim();
   const rows = recRows.filter(r => r.on);
-  if (!name || !rows.length) { alert('保存する記録がありません（「記録を生成」してチェックを入れてください）'); return; }
-  if (!dupConfirm()) return;
+  if (!name || !rows.length) { if (!opt.quiet) alert('保存する記録がありません（「記録を生成」してチェックを入れてください）'); return; }
+  if (!opt.quiet && !dupConfirm()) return;
   const byMonth = {};
   rows.forEach(r => { const k = ymd(r.date).slice(0, 7); (byMonth[k] = byMonth[k] || []).push(r); });
   let n = 0, ok = true;
@@ -852,7 +860,8 @@ async function saveRecords() {
     ok = (await putDoc('records', id, { name, month, rows: list, updatedAt: new Date().toISOString() })) && ok;
   }
   refreshSavedMonths();
-  if (ok) alert(`${name} 様の訪問記録 ${n}件を保存しました${DB ? '（共有）' : ''}`);
+  if (ok && opt.quiet) setSyncStatus(DB ? `☁ 共有保存・記録を自動保存 ${hhmm()}` : `💾 この端末に保存 ${hhmm()}`, DB ? 'ok' : 'local');
+  if (ok && !opt.quiet) alert(`${name} 様の訪問記録 ${n}件を保存しました${DB ? '（共有）' : ''}`);
 }
 function refreshSavedMonths() {
   const sel = document.getElementById('recSavedMonth'); if (!sel) return;
@@ -1007,12 +1016,28 @@ function pickUser(name) {
 }
 
 // ===== 編集 =====
-function addEntry(block) { state.days[currentDay][block].push(emptyEntry()); render(); }
-function removeEntry(block, i) { state.days[currentDay][block].splice(i, 1); render(); }
+// ---- 自動保存（「💾 保存」を押し忘れても、入力の1.5秒後に保存） ----
+let sheetTimer = null, recTimer = null;
+const hhmm = () => new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+function markSheetDirty() {
+  clearTimeout(sheetTimer);
+  sheetTimer = setTimeout(async () => {
+    const name = (state.name || '').trim(); if (!name || !hasContent()) return;
+    const ok = await saveSchedule(name, { name, days: state.days });
+    if (!DB) { refreshSavedList(); refreshUserPick(); }
+    if (ok) setSyncStatus(DB ? `☁ 共有保存・自動保存 ${hhmm()}` : `💾 この端末に保存 ${hhmm()}`, DB ? 'ok' : 'local');
+  }, 1500);
+}
+function markRecDirty() {
+  clearTimeout(recTimer);
+  recTimer = setTimeout(() => saveRecords({ quiet: true }), 3000);
+}
+function addEntry(block) { state.days[currentDay][block].push(emptyEntry()); render(); markSheetDirty(); }
+function removeEntry(block, i) { state.days[currentDay][block].splice(i, 1); render(); markSheetDirty(); }
 function moveEntry(block, i, dir) {
   const arr = state.days[currentDay][block]; const j = i + dir;
   if (j < 0 || j >= arr.length) return;
-  [arr[i], arr[j]] = [arr[j], arr[i]]; render();
+  [arr[i], arr[j]] = [arr[j], arr[i]]; render(); markSheetDirty();
 }
 function detailLines(d) { return String(d || '').split('\n').map(x => x.trim()).filter(Boolean); }
 // 内容の候補: 決まった候補＋保存済みの予定表で使われている内容（外しても候補に残る）
@@ -1034,9 +1059,9 @@ function toggleDetail(block, i, v, addOnly) {
   const e = state.days[currentDay][block][i], ls = detailLines(e.detail);
   const k = ls.indexOf(v);
   if (k >= 0) { if (addOnly) return; ls.splice(k, 1); } else ls.push(v);
-  e.detail = ls.join('\n'); renderEditor(); renderPaper(); updateTabMarks();
+  e.detail = ls.join('\n'); renderEditor(); renderPaper(); updateTabMarks(); markSheetDirty();
 }
-function setField(block, i, key, val) { state.days[currentDay][block][i][key] = val; renderPaper(); updateTabMarks(); }
+function setField(block, i, key, val) { state.days[currentDay][block][i][key] = val; renderPaper(); updateTabMarks(); markSheetDirty(); }
 function copyDay() {
   const to = +document.getElementById('copyTarget').value;
   if (to === currentDay) { alert('同じ曜日です'); return; }
@@ -1045,7 +1070,7 @@ function copyDay() {
     if (!confirm(`${DAYS[to]}曜日の内容を上書きしますか？`)) return;
   }
   state.days[to] = JSON.parse(JSON.stringify(src));
-  render();
+  render(); markSheetDirty();
 }
 
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
@@ -1487,7 +1512,7 @@ function toggleKP(i, key) {
   const r = recRows[i], kp = kpOf(r), k = kp.indexOf(key);
   if (k >= 0) kp.splice(k, 1); else kp.push(key);
   r.text = uniqueText(r, recRows.filter((_, j) => j !== i)); // 選び直したら文章も作り直す
-  renderRecordView();
+  renderRecordView(); markRecDirty();
   if (kpPopRow === i) renderKpPop(i);
 }
 function recItemChips(r, i) {
@@ -1544,7 +1569,7 @@ function buildRecords() {
     }
   }
   recRows.sort((a, b) => (b.date - a.date) || ((b.e.start || '') > (a.e.start || '') ? 1 : -1));
-  renderRecordView();
+  renderRecordView(); markRecDirty();
 }
 
 // ---- NG表現（含まれていたらアラーム。「NG表現を編集」で変更） ----
@@ -1769,7 +1794,7 @@ function renderGlobStates() {
 function statePhrase(k) { for (const g of Object.values(STATES)) if (g[k]) return pick(g[k]); return ''; }
 function appendState(i, k) {
   const r = recRows[i]; const t = statePhrase(k);
-  r.text = (r.text || '').replace(/\s+$/, '') + t;
+  r.text = (r.text || '').replace(/\s+$/, '') + t; markRecDirty();
   const ta = document.querySelector(`#recordView tr:nth-child(${i + 2}) td.txt textarea`);
   if (ta) { ta.value = r.text; ta.style.borderColor = 'var(--accent)'; setTimeout(() => ta.style.borderColor = '', 600); }
 }
@@ -1786,6 +1811,9 @@ function openStatePop(i, btn) {
   pop.style.left = Math.max(8, Math.min(window.scrollX + rect.left - 470, window.innerWidth - 480)) + 'px';
   pop.style.top = (window.scrollY + rect.bottom + 4) + 'px';
 }
+// 記録の表で文章・担当・チェック・↻ を触ったら自動保存
+['input', 'change'].forEach(t => document.getElementById('recordView').addEventListener(t, () => markRecDirty()));
+document.getElementById('recordView').addEventListener('click', ev => { if (ev.target.closest('td.act button[title="別の言い回し"]')) markRecDirty(); });
 document.addEventListener('click', ev => {
   const kpp = document.getElementById('kpPop');
   const path = ev.composedPath(); // 押した項目は描き直しで消えるので、押した時点の経路で判定
@@ -1808,6 +1836,7 @@ function copyRecordsTsv() {
   const rows = recRows.filter(r => r.on);
   if (!rows.length) { alert('出力する行がありません'); return; }
   if (!dupConfirm()) return;
+  saveRecords({ quiet: true });
   const tsv = ['日時\t担当\t種別\t実施項目\t記録', ...rows.map(r => [fmtKaipoke(r.date, r.e), r.staff, r.kind, kpText(r), r.text.replace(/\t|\n/g, ' ')].join('\t'))].join('\n');
   copyText(tsv); alert(`${rows.length}件をコピーしました（Excelに貼り付けできます）`);
 }
@@ -1837,6 +1866,7 @@ async function exportRecordsDocx() {
   const rows = recRows.filter(r => r.on);
   if (!rows.length) { alert('出力する行がありません'); return; }
   if (!dupConfirm()) return;
+  saveRecords({ quiet: true });
   const btn = document.getElementById('docxBtn'), label = btn.textContent;
   btn.disabled = true; btn.textContent = 'Word作成中…';
   try {
@@ -1881,6 +1911,7 @@ async function exportRecordsPdf() {
   const rows = recRows.filter(r => r.on);
   if (!rows.length) { alert('出力する行がありません'); return; }
   if (!dupConfirm()) return;
+  saveRecords({ quiet: true });
   try { await loadLib('pdfOut'); } catch {}
   if (!window.html2canvas || !window.jspdf) { alert('PDF作成の部品を読み込めませんでした。通信状態を確認して再読み込みしてください'); return; }
   const btn = document.getElementById('pdfBtn'), label = btn.textContent;
