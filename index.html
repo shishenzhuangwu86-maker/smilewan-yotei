@@ -192,7 +192,36 @@
   .rec-items .chip { font-size: 11px; padding: 1px 7px; }
   .rec-add { width: 100%; font: inherit; font-size: 11px; padding: 2px 5px; margin-top: 3px; border: 1px dashed var(--line); border-radius: 4px; background: transparent; color: var(--text); }
   @media print { .rec-items button { display: none; } }
-  body.mode-record .paper-scroll, body.mode-help .paper-scroll { display: none; }
+  body.mode-record .paper-scroll, body.mode-help .paper-scroll, body.mode-shop .paper-scroll { display: none; }
+  #shopView { width: 100%; max-width: 1000px; }
+  .shop-sec { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; }
+  .shop-sec h2 { margin: 0 0 10px; font-size: 18px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .shop-sec h2 small { font-size: 12px; color: var(--muted); font-weight: normal; }
+  .shop-cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+  .shop-cat h3 { margin: 0 0 6px; font-size: 13px; color: var(--muted); border-bottom: 1px solid var(--line); padding-bottom: 3px; }
+  .shop-item { display: flex; align-items: flex-start; gap: 8px; padding: 6px 4px; font-size: 15px; border-radius: 6px; cursor: pointer; line-height: 1.35; }
+  .shop-item:hover { background: var(--accent-soft); }
+  .shop-item input { width: 20px; height: 20px; margin: 0; flex: none; }
+  .shop-item.done span { text-decoration: line-through; color: var(--muted); }
+  .shop-item small { display: block; color: var(--muted); font-size: 11px; }
+  .menu-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+  .menu-card { border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; }
+  .menu-card .when { font-size: 12px; color: var(--muted); }
+  .menu-card .dish { font-size: 15px; font-weight: bold; margin: 3px 0; line-height: 1.5; }
+  .menu-card .amt { font-size: 11px; color: var(--muted); line-height: 1.6; }
+  .shop-empty { color: var(--muted); padding: 20px; text-align: center; }
+  .shop-sec details summary { cursor: pointer; font-size: 14px; font-weight: bold; }
+  .goods-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  .goods-table th, .goods-table td { border: 1px solid var(--line); padding: 5px 7px; text-align: left; vertical-align: middle; }
+  .goods-table small { color: var(--muted); }
+  .rec-steps { display: flex; gap: 4px; padding: 0; margin: 0 0 10px; list-style: none; counter-reset: st; flex-wrap: wrap; }
+  .rec-steps li { counter-increment: st; flex: 1 1 0; min-width: 7em; font-size: 12px; padding: 6px 8px; border-radius: 6px; background: var(--soft, rgba(127,127,127,.08)); color: var(--muted); line-height: 1.35; }
+  .rec-steps li::before { content: counter(st) ' '; font-weight: bold; }
+  .rec-steps li small { display: block; font-size: 10px; }
+  .rec-steps li.now { background: var(--accent); color: #fff; font-weight: bold; }
+  .rec-steps li.done { color: var(--text); }
+  .rec-steps li.done::before { content: '✓ '; }
+  @media print { body.mode-shop #shopView details, body.mode-shop .shop-item input { display: none; } body.mode-shop .shop-sec { border: none; padding: 0; } }
   #syncBanner { background: var(--dup-alert-bg); color: var(--dup-alert-text); border: 1px solid var(--dup-alert-line); border-radius: 6px; padding: 8px 10px; margin: 0 0 10px; font-size: 13px; font-weight: bold; }
   #helpView { width: 100%; max-width: 900px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; line-height: 1.7; }
   #helpView h2 { margin: 0 0 6px; font-size: 20px; }
@@ -224,6 +253,7 @@
     <div class="mode-tabs">
       <button id="modeSheetBtn" class="active" onclick="setMode('sheet')">📅 予定表</button>
       <button id="modeRecordBtn" onclick="setMode('record')">📝 訪問記録</button>
+      <button id="modeShopBtn" onclick="setMode('shop')">🛒 買い物</button>
       <button id="modeHelpBtn" onclick="setMode('help')">📖 使い方</button>
     </div>
     <div id="sheetPanel">
@@ -280,11 +310,7 @@
       <button class="small" onclick="document.getElementById('assessFile').click()">📋 アセスメント・計画書取込（PDF・複数可）</button>
       <input type="file" id="assessFile" accept="application/pdf" multiple style="display:none" onchange="importAssessment(this)">
       <label>🍱 献立・買い物リスト</label>
-      <label style="font-weight:normal">食べられない物・嫌いな物・アレルギー（「、」区切り。献立と買い物リストから外します）</label>
-      <input type="text" id="ciFood" placeholder="例：えび、そば、牛乳、生野菜" oninput="clientDirty()">
-      <div class="hint" id="menuRules" style="margin:4px 0"></div>
-      <div class="row"><button class="small" onclick="makeMenu()">🍱 献立と買い物リストを作成</button><button class="small" onclick="copyMenu(this)">📋 コピー</button></div>
-      <div id="menuOut"></div>
+      <button class="small" onclick="setMode('shop')">🛒 買い物タブで見る・作る</button>
       <div class="row" style="margin-top:6px"><button class="small primary fixed" onclick="saveClientInfo()">💾 利用者情報を保存</button><span class="hint" style="margin:0">手で直した内容は、CSVを取り込み直しても消えません。</span></div>
     </details>
 
@@ -303,7 +329,22 @@
     <div class="hint">※ 時間を空欄にすると「通院介助／2週に1回」のように内容だけが表示されます。黄色マーカーはチェックで付けられます。</div>
     </div><!-- /sheetPanel -->
 
+    <div id="shopPanel" style="display:none">
+      <label>利用者</label>
+      <select id="shopUser" onchange="if(this.value){loadSaved(this.value);renderShop();}"></select>
+      <label>食べられない物・嫌いな物・アレルギー（「、」区切り）</label>
+      <input type="text" id="ciFood" placeholder="例：えび、そば、牛乳、生野菜" onchange="saveFood()">
+      <div class="hint" id="menuRules" style="margin:4px 0"></div>
+      <div class="toolbar" style="margin-top:8px">
+        <button class="primary" onclick="makeMenu()">🍱 献立と買い物リストを作る</button>
+        <button onclick="copyMenu(this)">📋 LINE用にコピー</button>
+        <button onclick="window.print()">🖨 印刷</button>
+      </div>
+      <div class="hint">予定表の「調理・朝食・昼食・夕食」の曜日に合わせて1週間分を作ります。押すたびに別の献立になります。<br>買い物リストは、買ったらチェック。日用品にチェックすると「今日買った」になります。</div>
+    </div>
+
     <div id="recordPanel" style="display:none">
+      <ol class="rec-steps" id="recSteps"><li>利用者と期間を選ぶ</li><li>「📝 記録を生成」</li><li>文章を確認・直す<small>↻言い換え／＋項目／📝記録欄</small></li><li>自動で保存 → Word書き出し</li></ol>
       <div class="toolbar">
         <button class="primary" onclick="buildRecords()">📝 記録を生成</button>
         <button onclick="copyRecordsTsv()">表をコピー</button>
@@ -376,6 +417,7 @@
     <div class="print-note">↓ 印刷プレビュー（A4横）。「印刷する」ボタンでこの用紙だけが印刷されます。</div>
     <div class="paper-scroll"><div class="paper" id="paper"></div></div>
     <div id="recordView" style="display:none"></div>
+    <div id="shopView" style="display:none"></div>
     <div id="helpView" style="display:none">
       <h2>📖 使い方</h2>
       <p class="lead">訪問介護すまいるわんの週間予定表・訪問記録を作るツールです。ログイン不要、事業所の合言葉で開きます。</p>
@@ -438,7 +480,8 @@
           <ul>
             <li><b>実施項目</b>：カイポケでチェックする項目が青く選ばれている。押すと外れ、「＋項目」でカイポケと同じ並びの一覧から足せる</li>
             <li><b>📝記録欄</b>：カイポケの欄（顔色・発汗・体温・血圧・排尿／排便の回数・量・食事量・水分cc・部分浴・清拭・整容・買物の金額と内訳・その他・予定の変更・加算）。入れた数字は文章に自動で書き足され、消すと文章からも消える。文章に書いた体温・血圧・排尿／排便・食事量・水分cc・清拭・整容・金額なども自動で欄に入る（点線。文章を打っている途中でも反映）。押せば選び直せる</li>
-            <li><b>🍱 献立・買い物リスト</b>（利用者情報の中）：予定表の調理の曜日・食事ごとに献立を作り、材料をまとめた買い物リストも作る。アセスメントの病名（高血圧→減塩、糖尿病→糖質控えめ）・義歯（やわらかい料理）・調理の力（障害→簡単な料理）と、「食べられない物」欄・NGの言葉を外して作る。献立には1人分の量（例：豚肉80g・玉ねぎ1/2個、ご飯1膳150g）が付き、買い物リストは1週間の合計量（買う単位に切り上げ）と米の合数、生活に必要な日用品（予定表の支援・アセスメントから：洗剤・トイレットペーパー・おむつ・入れ歯洗浄剤など）も出る。作った献立は記録の「調理」の文に入る。日用品は「買う周期（日）」と「前回買った日」を利用者ごとに持ち、今週買う時期の物だけ買い物リストに入る（周期の初期値は1人暮らしの目安。「✓今日買った」か、記録に「購入品：トイレットペーパー」などと書いて保存すると前回買った日が更新される）</li>
+            <li><b>🛒 買い物タブ</b>：利用者を選んで「🍱 献立と買い物リストを作る」。買い物リストはチェックしながら使える（チェックは保存され、他の端末でも同じ）。日用品にチェックすると「今日買った」になる。周期の設定は下の「⚙ 日用品の買う周期」を開く。「LINE用にコピー」「印刷」もある。</li>
+            <li><b>🍱 献立・買い物リスト</b>：予定表の調理の曜日・食事ごとに献立を作り、材料をまとめた買い物リストも作る。アセスメントの病名（高血圧→減塩、糖尿病→糖質控えめ）・義歯（やわらかい料理）・調理の力（障害→簡単な料理）と、「食べられない物」欄・NGの言葉を外して作る。献立には1人分の量（例：豚肉80g・玉ねぎ1/2個、ご飯1膳150g）が付き、買い物リストは1週間の合計量（買う単位に切り上げ）と米の合数、生活に必要な日用品（予定表の支援・アセスメントから：洗剤・トイレットペーパー・おむつ・入れ歯洗浄剤など）も出る。作った献立は記録の「調理」の文に入る。日用品は「買う周期（日）」と「前回買った日」を利用者ごとに持ち、今週買う時期の物だけ買い物リストに入る（周期の初期値は1人暮らしの目安。「✓今日買った」か、記録に「購入品：トイレットペーパー」などと書いて保存すると前回買った日が更新される）</li>
             <li><b>記録の文章</b>：直接書き換えられる。「↻」で別の言い回し</li>
             <li><b>様子</b>：「😊様子」で一文を足す（★はアセスメントからのおすすめ）</li>
             <li>出力しない行は左のチェックを外す</li>
@@ -898,7 +941,7 @@ function renderClientBox(force) {
   const i = name ? clientInfoOf(name) : { address: '', phone: '', emergency: '', memo: '' };
   document.getElementById('ciAddress').value = i.address; document.getElementById('ciPhone').value = i.phone;
   document.getElementById('ciEmergency').value = i.emergency; document.getElementById('ciMemo').value = i.memo;
-  document.getElementById('ciFood').value = name ? (getColl('clients')[docId(name)]?.food || '') : ''; renderMenu();
+  renderShop();
   const st = document.getElementById('clientState');
   st.textContent = !name ? '' : i.manual ? '保存済み' : (i.address || i.phone) ? 'CSVから' : '未入力'; st.className = 'sync ' + (i.manual ? 'ok' : 'local');
 }
@@ -906,7 +949,7 @@ async function saveClientInfo() {
   const name = (state.name || '').trim();
   if (!name) { alert('先に利用者名を入力（または選択）してください'); return; }
   const prevNg = clientNg(name), prevDoc = getColl('clients')[docId(name)] || {};
-  const data = { ...prevDoc, name, ng: prevNg, address: document.getElementById('ciAddress').value.trim(), phone: document.getElementById('ciPhone').value.trim(), emergency: document.getElementById('ciEmergency').value.trim(), memo: document.getElementById('ciMemo').value.trim(), food: document.getElementById('ciFood').value.trim(), updatedAt: new Date().toISOString() };
+  const data = { ...prevDoc, name, ng: prevNg, address: document.getElementById('ciAddress').value.trim(), phone: document.getElementById('ciPhone').value.trim(), emergency: document.getElementById('ciEmergency').value.trim(), memo: document.getElementById('ciMemo').value.trim(), updatedAt: new Date().toISOString() };
   const ok = await putDoc('clients', docId(name), data);
   clientEdited = false; renderClientBox(true);
   if (ok) alert(`「${name}」の利用者情報を保存しました${DB ? '（共有）' : ''}`);
@@ -973,7 +1016,7 @@ async function setGoods(item, key, val) {
   const c = getColl('clients')[docId(name)] || { name }, g = { ...(c.goods || {}) };
   g[item] = { ...(g[item] || {}), [key]: key === 'cycle' ? Math.max(1, parseInt(val, 10) || GOODS_CYCLE[item]?.[0] || 30) : val };
   await putDoc('clients', docId(name), { ...c, name, goods: g, updatedAt: new Date().toISOString() });
-  renderMenu();
+  renderShop();
 }
 const mdTxt = d => d ? `${+d.slice(5, 7)}/${+d.slice(8, 10)}` : '';
 // 生活に必要な物（予定表の支援・アセスメントから。在庫を見て足りない物だけ買う）
@@ -1064,25 +1107,62 @@ function makeMenu() {
   const doc = getColl('clients')[docId(name)] || { name };
   const menu = { created: new Date().toISOString(), plan: plan.map(({ ing, ...p }) => p), list, notes: R.notes };
   putDoc('clients', docId(name), { ...doc, name, food: document.getElementById('ciFood').value.trim(), menu, updatedAt: new Date().toISOString() });
-  renderMenu();
+  renderShop();
 }
 function goodsDueText(name) { return goodsOf(name).filter(g => g.due).map(g => `${g.name}（${g.last ? g.cycle + '日ごと' : '前回未記録・在庫を確認'}）`).join('、'); }
-function renderMenu() {
-  const out = document.getElementById('menuOut'), rules = document.getElementById('menuRules'); if (!out) return;
-  const name = (state.name || '').trim(), m = name && getColl('clients')[docId(name)]?.menu;
-  rules.textContent = name ? '配慮：' + (menuRules(name).notes.join('／') || '特になし（アセスメントに食事の制限なし）') : '';
-  if (!name) { out.innerHTML = ''; return; }
-  const goods = goodsOf(name), due = goodsDueText(name);
-  out.innerHTML = (m ? `<table><tr><th>曜日</th><th>食事</th><th>献立（1人分の量）</th></tr>${m.plan.map(p => `<tr><td>${DAYS[p.dow]}</td><td>${p.meal}</td><td><b>${esc(p.dishes.join('・'))}</b>${p.amounts ? `<br><small style="color:var(--muted)">${esc(p.amounts.join('／'))}</small>` : ''}</td></tr>`).join('')}</table>
-    <div class="shop"><b>🛒 買い物リスト</b><br>${Object.entries(m.list).map(([c, xs]) => `<b>${c}</b>${esc(xs.join('、'))}`).join('<br>')}${due ? `<br><b>日用品（今週）</b>${esc(due)}` : ''}</div>
-    <div class="hint">作成日 ${m.created.slice(0, 10)}　※ 記録の「調理」の文にこの献立が入ります。冷蔵庫の残りを見て調整してください。</div>` : '') +
-    (goods.length ? `<table><tr><th>日用品</th><th>買う周期</th><th>前回買った日</th><th>次に買う頃</th></tr>${goods.map(g => `<tr${g.due ? ' style="background:rgba(255,190,0,.12)"' : ''}>
-      <td>${esc(g.name)}<br><small style="color:var(--muted)">${esc(g.hint)}</small></td>
-      <td><input type="number" min="1" style="width:52px" value="${g.cycle}" data-k="${esc(g.name)}" onchange="setGoods(this.dataset.k,'cycle',this.value)">日</td>
-      <td><input type="date" style="width:118px;font-size:11px" value="${g.last}" data-k="${esc(g.name)}" onchange="setGoods(this.dataset.k,'last',this.value)"></td>
-      <td style="white-space:nowrap">${g.last ? mdTxt(g.next) + (g.next < todayYmd() ? ' <b>過ぎています</b>' : g.due ? ' <b>今週</b>' : '') : '<b>未記録</b>'}<br><button class="small" style="white-space:nowrap;margin-top:3px" data-k="${esc(g.name)}" onclick="setGoods(this.dataset.k,'last',todayYmd())">✓ 今日買った</button></td></tr>`).join('')}</table>
-      <div class="hint">周期の初期値は1人暮らしの一般的な使用量の目安です。使う量に合わせて日数を直してください。黄色＝今週買う物（買い物リストに入ります）。</div>` : '');
+function refreshShopUsers() {
+  const sel = document.getElementById('shopUser'); if (!sel) return;
+  const cur = (state.name || '').trim(), names = Object.keys(getStore()).sort((a, b) => a.localeCompare(b, 'ja'));
+  sel.innerHTML = '<option value="">（利用者を選ぶ）</option>' + names.map(n => `<option value="${esc(n)}" ${n === cur ? 'selected' : ''}>［${kubunOf(n)}］${esc(n)}</option>`).join('');
 }
+async function saveFood() {
+  const name = (state.name || '').trim(); if (!name) return;
+  const c = getColl('clients')[docId(name)] || { name };
+  await putDoc('clients', docId(name), { ...c, name, food: document.getElementById('ciFood').value.trim(), updatedAt: new Date().toISOString() });
+  renderShop();
+}
+// 買い物リストのチェック（献立ごとに保存）
+async function toggleShop(key, on) {
+  const name = (state.name || '').trim(), c = getColl('clients')[docId(name)]; if (!c?.menu) return;
+  const checked = { ...(c.menu.checked || {}) }; if (on) checked[key] = 1; else delete checked[key];
+  await putDoc('clients', docId(name), { ...c, menu: { ...c.menu, checked }, updatedAt: new Date().toISOString() });
+  renderShop();
+}
+async function toggleGoods(item, on) {
+  const name = (state.name || '').trim(), c = getColl('clients')[docId(name)] || { name }, g = { ...(c.goods || {}) };
+  const prev = g[item] || {};
+  g[item] = on ? { ...prev, last: todayYmd(), prevLast: prev.last || '' } : { ...prev, last: prev.prevLast || '' };
+  await putDoc('clients', docId(name), { ...c, name, goods: g, updatedAt: new Date().toISOString() });
+  renderShop();
+}
+function renderShop() {
+  const v = document.getElementById('shopView'), rules = document.getElementById('menuRules'); if (!v) return;
+  const name = (state.name || '').trim(), c = name ? getColl('clients')[docId(name)] || {} : {}, m = c.menu;
+  const food = document.getElementById('ciFood'); if (food && document.activeElement !== food) food.value = c.food || '';
+  const su = document.getElementById('shopUser'); if (su && su.value !== name) { if (![...su.options].some(o => o.value === name)) refreshShopUsers(); su.value = name; }
+  if (rules) rules.textContent = name ? '配慮：' + (menuRules(name).notes.join('／') || '特になし（アセスメントに食事の制限なし）') : '';
+  if (!name) { v.innerHTML = '<div class="shop-sec shop-empty">左で利用者を選んでください</div>'; return; }
+  const ck = (m && m.checked) || {};
+  const item = (key, label, sub, on, fn) => `<label class="shop-item ${on ? 'done' : ''}"><input type="checkbox" ${on ? 'checked' : ''} data-k="${esc(key)}" onchange="${fn}(this.dataset.k,this.checked)"><span>${esc(label)}${sub ? `<small>${esc(sub)}</small>` : ''}</span></label>`;
+  // 日用品：今週買う物＋今日チェックした物
+  const goods = goodsOf(name), gToday = goods.filter(g => g.due || g.last === todayYmd());
+  const cats = m ? Object.entries(m.list) : [];
+  const shop = `<div class="shop-sec"><h2>🛒 今週の買い物リスト <small>${esc(name)} 様${m ? '　作成 ' + m.created.slice(5, 10).replace('-', '/') : ''}</small></h2>
+    ${cats.length || gToday.length ? `<div class="shop-cols">${cats.map(([cat, xs]) => `<div class="shop-cat"><h3>${esc(cat)}</h3>${xs.map(x => { const [nm, ...rest] = x.split(/ (?=[\d約])/); return item(x, nm, rest.join(' '), !!ck[x], 'toggleShop'); }).join('')}</div>`).join('')}
+      ${gToday.length ? `<div class="shop-cat"><h3>日用品（今週）</h3>${gToday.map(g => item(g.name, g.name, g.last === todayYmd() ? '今日買った' : g.last ? `${g.cycle}日ごと・${mdTxt(g.next)}頃` : '前回未記録・在庫を確認', g.last === todayYmd(), 'toggleGoods')).join('')}</div>` : ''}</div>`
+      : '<div class="shop-empty">左の「🍱 献立と買い物リストを作る」を押してください</div>'}</div>`;
+  const menu = m ? `<div class="shop-sec"><h2>🍱 献立 <small>1人分の量の目安</small></h2><div class="menu-cards">${m.plan.map(p => `<div class="menu-card"><div class="when">${DAYS[p.dow]}曜　${p.meal}</div><div class="dish">${esc(p.dishes.join('・'))}</div>${p.amounts ? `<div class="amt">${p.amounts.map(esc).join('<br>')}</div>` : ''}</div>`).join('')}</div>
+    <div class="hint" style="margin-top:8px">記録の「調理」の文にこの献立が入ります。冷蔵庫の残りを見て調整してください。</div></div>` : '';
+  const set = goods.length ? `<div class="shop-sec"><details><summary>⚙ 日用品の買う周期（${goods.length}品）</summary>
+    <table class="goods-table"><tr><th>日用品</th><th>買う周期</th><th>前回買った日</th><th>次に買う頃</th></tr>${goods.map(g => `<tr>
+      <td>${esc(g.name)}<br><small>${esc(g.hint)}</small></td>
+      <td><input type="number" min="1" style="width:56px" value="${g.cycle}" data-k="${esc(g.name)}" onchange="setGoods(this.dataset.k,'cycle',this.value)"> 日</td>
+      <td><input type="date" value="${g.last}" data-k="${esc(g.name)}" onchange="setGoods(this.dataset.k,'last',this.value)"></td>
+      <td>${g.last ? mdTxt(g.next) + (g.next < todayYmd() ? ' <b>過ぎています</b>' : g.due ? ' <b>今週</b>' : '') : '<b>未記録</b>'}</td></tr>`).join('')}</table>
+    <div class="hint">周期の初期値は1人暮らしの一般的な使用量の目安です。使う量に合わせて日数を直してください。記録に「購入品：トイレットペーパー」などと書いて保存しても、前回買った日が入ります。</div></details></div>` : '';
+  v.innerHTML = shop + menu + set;
+}
+const renderMenu = renderShop;
 function menuText(name) {
   const m = getColl('clients')[docId(name)]?.menu, due = goodsDueText(name); if (!m && !due) return '';
   return (m ? `【${name} 様　献立（1人分）】\n` + m.plan.map(p => `${DAYS[p.dow]}　${p.meal}：${p.dishes.join('・')}${p.amounts ? `\n　　${p.amounts.join('／')}` : ''}`).join('\n') + '\n\n' : '') + '【買い物リスト】\n' + (m ? Object.entries(m.list).map(([c, xs]) => `${c}：${xs.join('、')}`).join('\n') : '') + (due ? `\n日用品（今週）：${due}` : '');
@@ -1552,14 +1632,19 @@ function setMode(m) {
   document.getElementById('recordPanel').style.display = m === 'record' ? '' : 'none';
   document.getElementById('recordView').style.display = m === 'record' ? '' : 'none';
   document.getElementById('helpView').style.display = m === 'help' ? '' : 'none';
+  document.getElementById('shopPanel').style.display = m === 'shop' ? '' : 'none';
+  document.getElementById('shopView').style.display = m === 'shop' ? '' : 'none';
+  document.body.classList.toggle('mode-shop', m === 'shop');
+  document.getElementById('modeShopBtn').classList.toggle('active', m === 'shop');
   document.body.classList.toggle('mode-help', m === 'help');
   document.getElementById('modeHelpBtn').classList.toggle('active', m === 'help');
   document.getElementById('modeSheetBtn').classList.toggle('active', m === 'sheet');
   document.getElementById('modeRecordBtn').classList.toggle('active', m === 'record');
-  document.querySelector('.print-note').textContent = m === 'help' ? '' : m === 'record'
+  document.querySelector('.print-note').textContent = m === 'help' || m === 'shop' ? '' : m === 'record'
     ? '↓ 訪問記録（チェックした行だけが印刷・書き出しされます）'
     : '↓ 印刷プレビュー（A4横）。「印刷する」ボタンでこの用紙だけが印刷されます。';
-  pageStyle.textContent = m === 'record' ? '@page { size: A4 portrait; margin: 12mm; }' : '@page { size: A4 landscape; margin: 0; }';
+  pageStyle.textContent = m === 'record' || m === 'shop' ? '@page { size: A4 portrait; margin: 12mm; }' : '@page { size: A4 landscape; margin: 0; }';
+  if (m === 'shop') { refreshShopUsers(); renderShop(); }
   if (m === 'record') {
     refreshRecUsers();
     if (!document.getElementById('recFrom').value) {
@@ -2462,7 +2547,13 @@ function dupGroups() {
   recRows.forEach((r, i) => { if (!r.on) return; const k = normText(r.text); if (!k) return; if (!m.has(k)) m.set(k, []); m.get(k).push(i); });
   return [...m.values()].filter(g => g.length > 1);
 }
+function renderRecSteps() {
+  const li = [...document.querySelectorAll('#recSteps li')]; if (!li.length) return;
+  const name = (state.name || '').trim(), st = !name ? 0 : !recRows.length ? 1 : 2;
+  li.forEach((x, i) => { x.className = i < st ? 'done' : i === st ? 'now' : ''; });
+}
 function renderRecordView() {
+  renderRecSteps();
   document.getElementById('statePop').style.display = 'none';
   const v = document.getElementById('recordView');
   if (!recRows.length) { v.innerHTML = '<div class="rec-empty">利用者と期間を選んで「記録を生成」を押してください</div>'; return; }
