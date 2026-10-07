@@ -171,7 +171,7 @@
   #vPop .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; }
   #vPop input[type=number], #vPop input[type=text] { width: 64px; padding: 3px 5px; font-size: 12px; }
   #menuOut table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
-  #menuOut th, #menuOut td { border: 1px solid var(--line); padding: 3px 5px; text-align: left; vertical-align: top; }
+  #menuOut th, #menuOut td { border: 1px solid var(--line); padding: 3px 4px; text-align: left; vertical-align: top; }
   #menuOut th { background: var(--soft, rgba(127,127,127,.08)); white-space: nowrap; }
   #menuOut .shop { font-size: 12px; margin-top: 6px; line-height: 1.7; }
   #menuOut .shop b { display: inline-block; min-width: 7.5em; }
@@ -438,7 +438,7 @@
           <ul>
             <li><b>実施項目</b>：カイポケでチェックする項目が青く選ばれている。押すと外れ、「＋項目」でカイポケと同じ並びの一覧から足せる</li>
             <li><b>📝記録欄</b>：カイポケの欄（顔色・発汗・体温・血圧・排尿／排便の回数・量・食事量・水分cc・部分浴・清拭・整容・買物の金額と内訳・その他・予定の変更・加算）。入れた数字は文章に自動で書き足され、消すと文章からも消える。文章に書いた体温・血圧・排尿／排便・食事量・水分cc・清拭・整容・金額なども自動で欄に入る（点線。文章を打っている途中でも反映）。押せば選び直せる</li>
-            <li><b>🍱 献立・買い物リスト</b>（利用者情報の中）：予定表の調理の曜日・食事ごとに献立を作り、材料をまとめた買い物リストも作る。アセスメントの病名（高血圧→減塩、糖尿病→糖質控えめ）・義歯（やわらかい料理）・調理の力（障害→簡単な料理）と、「食べられない物」欄・NGの言葉を外して作る。献立には1人分の量（例：豚肉80g・玉ねぎ1/2個、ご飯1膳150g）が付き、買い物リストは1週間の合計量（買う単位に切り上げ）と米の合数、生活に必要な日用品（予定表の支援・アセスメントから：洗剤・トイレットペーパー・おむつ・入れ歯洗浄剤など）も出る。作った献立は記録の「調理」の文に入る</li>
+            <li><b>🍱 献立・買い物リスト</b>（利用者情報の中）：予定表の調理の曜日・食事ごとに献立を作り、材料をまとめた買い物リストも作る。アセスメントの病名（高血圧→減塩、糖尿病→糖質控えめ）・義歯（やわらかい料理）・調理の力（障害→簡単な料理）と、「食べられない物」欄・NGの言葉を外して作る。献立には1人分の量（例：豚肉80g・玉ねぎ1/2個、ご飯1膳150g）が付き、買い物リストは1週間の合計量（買う単位に切り上げ）と米の合数、生活に必要な日用品（予定表の支援・アセスメントから：洗剤・トイレットペーパー・おむつ・入れ歯洗浄剤など）も出る。作った献立は記録の「調理」の文に入る。日用品は「買う周期（日）」と「前回買った日」を利用者ごとに持ち、今週買う時期の物だけ買い物リストに入る（周期の初期値は1人暮らしの目安。「✓今日買った」か、記録に「購入品：トイレットペーパー」などと書いて保存すると前回買った日が更新される）</li>
             <li><b>記録の文章</b>：直接書き換えられる。「↻」で別の言い回し</li>
             <li><b>様子</b>：「😊様子」で一文を足す（★はアセスメントからのおすすめ）</li>
             <li>出力しない行は左のチェックを外す</li>
@@ -951,6 +951,31 @@ const QTY = {
 };
 const fracTxt = x => { const r = Math.round(x * 6) / 6, w = Math.floor(r + 1e-9), f = r - w, F = [[1 / 6, '1/6'], [1 / 4, '1/4'], [1 / 3, '1/3'], [1 / 2, '1/2'], [2 / 3, '2/3'], [3 / 4, '3/4'], [5 / 6, '5/6']].reduce((b, c) => Math.abs(c[0] - f) < Math.abs(b[0] - f) ? c : b, [0, '']); return f < 0.08 ? String(w || 1) : (w ? w + 'と' : '') + F[1]; };
 const qtyTxt = (x, u) => u === 'g' || u === 'ml' ? Math.round(x / 10) * 10 + u : fracTxt(x) + u;
+// 日用品の買う周期（日）の初期値。1人暮らしでよく買う量での目安 → 利用者ごとに変更できる
+const GOODS_CYCLE = {
+  'トイレットペーパー': [30, '12ロール入り。1人で1ロール約2〜3日'], 'ティッシュ': [45, '5箱入り。1箱約1〜2週間'], 'ゴミ袋': [30, '30〜50枚入り。週2〜3回のゴミ出し'],
+  '食器用洗剤': [30, '本体1本。1人で約1ヶ月'], 'スポンジ': [30, '衛生のため月1回交換'], 'ラップ': [30, '20m巻き。1人で約1ヶ月'],
+  '洗濯用洗剤': [45, '本体1本で約30回分'], '住居用洗剤': [60, '本体1本で約2ヶ月'], 'トイレ用洗剤': [60, '本体1本で約2ヶ月'],
+  'シャンプー・ボディソープ': [60, '本体1本で約2ヶ月'], '紙パンツ（おむつ）': [7, '1日2〜3枚・1パック約20枚'], '尿取りパッド': [7, '1日4〜5枚・1パック約30枚'],
+  'おしりふき': [14, '1パック約80枚'], '歯磨き粉': [45, 'チューブ1本で約1〜2ヶ月'], '入れ歯洗浄剤': [90, '1箱約100錠・1日1錠'], 'お薬カレンダー用の袋・ケース': [180, '傷んだら交換'],
+};
+const addDays = (d, n) => { const x = new Date(d + 'T00:00:00'); x.setDate(x.getDate() + n); return ymd(x); };
+const todayYmd = () => ymd(new Date());
+function goodsOf(name) {
+  const c = getColl('clients')[docId(name)] || {}, g = c.goods || {}, R = menuRules(name);
+  return dailyGoods(name).filter(x => !R.ng.some(w => x.includes(w)) && !ngHits(x).length).map(x => {
+    const cycle = +(g[x]?.cycle || GOODS_CYCLE[x]?.[0] || 30), last = g[x]?.last || '', next = last ? addDays(last, cycle) : '';
+    return { name: x, cycle, last, next, hint: GOODS_CYCLE[x]?.[1] || '', due: !last || next <= addDays(todayYmd(), 7) };
+  });
+}
+async function setGoods(item, key, val) {
+  const name = (state.name || '').trim(); if (!name) return;
+  const c = getColl('clients')[docId(name)] || { name }, g = { ...(c.goods || {}) };
+  g[item] = { ...(g[item] || {}), [key]: key === 'cycle' ? Math.max(1, parseInt(val, 10) || GOODS_CYCLE[item]?.[0] || 30) : val };
+  await putDoc('clients', docId(name), { ...c, name, goods: g, updatedAt: new Date().toISOString() });
+  renderMenu();
+}
+const mdTxt = d => d ? `${+d.slice(5, 7)}/${+d.slice(8, 10)}` : '';
 // 生活に必要な物（予定表の支援・アセスメントから。在庫を見て足りない物だけ買う）
 function dailyGoods(name) {
   const c = getColl('clients')[docId(name)] || {}, a = c.assessment || {};
@@ -1034,7 +1059,6 @@ function makeMenu() {
     list[c].push(`${x} ${buy}${n > 1 ? `（${n}回分）` : ''}`); });
   const rice = plan.length * 150 * R.factor; // 炊いたご飯150g ≒ 米0.45合
   list['乾物・その他'].push(`米 約${(Math.ceil(rice / 330 * 2) / 2).toFixed(1).replace('.0', '')}合（${plan.length}食分・残りを確認）`, ...[...stock].map(x => x + '（在庫を確認）'));
-  list['日用品（在庫を見て足りない物）'] = dailyGoods(name).filter(x => !R.ng.some(w => x.includes(w)) && !ngHits(x).length);
   Object.keys(list).forEach(c => { if (!list[c].length) delete list[c]; });
   if (R.avoid.has('塩')) R.notes.push('汁物は1日1回まで（減塩）');
   const doc = getColl('clients')[docId(name)] || { name };
@@ -1042,18 +1066,26 @@ function makeMenu() {
   putDoc('clients', docId(name), { ...doc, name, food: document.getElementById('ciFood').value.trim(), menu, updatedAt: new Date().toISOString() });
   renderMenu();
 }
+function goodsDueText(name) { return goodsOf(name).filter(g => g.due).map(g => `${g.name}（${g.last ? g.cycle + '日ごと' : '前回未記録・在庫を確認'}）`).join('、'); }
 function renderMenu() {
   const out = document.getElementById('menuOut'), rules = document.getElementById('menuRules'); if (!out) return;
   const name = (state.name || '').trim(), m = name && getColl('clients')[docId(name)]?.menu;
   rules.textContent = name ? '配慮：' + (menuRules(name).notes.join('／') || '特になし（アセスメントに食事の制限なし）') : '';
-  if (!m) { out.innerHTML = ''; return; }
-  out.innerHTML = `<table><tr><th>曜日</th><th>食事</th><th>献立（1人分の量）</th></tr>${m.plan.map(p => `<tr><td>${DAYS[p.dow]}</td><td>${p.meal}</td><td><b>${esc(p.dishes.join('・'))}</b>${p.amounts ? `<br><small style="color:var(--muted)">${esc(p.amounts.join('／'))}</small>` : ''}</td></tr>`).join('')}</table>
-    <div class="shop"><b>🛒 買い物リスト</b><br>${Object.entries(m.list).map(([c, xs]) => `<b>${c}</b>${esc(xs.join('、'))}`).join('<br>')}</div>
-    <div class="hint">作成日 ${m.created.slice(0, 10)}　※ 記録の「調理」の文にこの献立が入ります。冷蔵庫の残りを見て調整してください。</div>`;
+  if (!name) { out.innerHTML = ''; return; }
+  const goods = goodsOf(name), due = goodsDueText(name);
+  out.innerHTML = (m ? `<table><tr><th>曜日</th><th>食事</th><th>献立（1人分の量）</th></tr>${m.plan.map(p => `<tr><td>${DAYS[p.dow]}</td><td>${p.meal}</td><td><b>${esc(p.dishes.join('・'))}</b>${p.amounts ? `<br><small style="color:var(--muted)">${esc(p.amounts.join('／'))}</small>` : ''}</td></tr>`).join('')}</table>
+    <div class="shop"><b>🛒 買い物リスト</b><br>${Object.entries(m.list).map(([c, xs]) => `<b>${c}</b>${esc(xs.join('、'))}`).join('<br>')}${due ? `<br><b>日用品（今週）</b>${esc(due)}` : ''}</div>
+    <div class="hint">作成日 ${m.created.slice(0, 10)}　※ 記録の「調理」の文にこの献立が入ります。冷蔵庫の残りを見て調整してください。</div>` : '') +
+    (goods.length ? `<table><tr><th>日用品</th><th>買う周期</th><th>前回買った日</th><th>次に買う頃</th></tr>${goods.map(g => `<tr${g.due ? ' style="background:rgba(255,190,0,.12)"' : ''}>
+      <td>${esc(g.name)}<br><small style="color:var(--muted)">${esc(g.hint)}</small></td>
+      <td><input type="number" min="1" style="width:52px" value="${g.cycle}" data-k="${esc(g.name)}" onchange="setGoods(this.dataset.k,'cycle',this.value)">日</td>
+      <td><input type="date" style="width:118px;font-size:11px" value="${g.last}" data-k="${esc(g.name)}" onchange="setGoods(this.dataset.k,'last',this.value)"></td>
+      <td style="white-space:nowrap">${g.last ? mdTxt(g.next) + (g.next < todayYmd() ? ' <b>過ぎています</b>' : g.due ? ' <b>今週</b>' : '') : '<b>未記録</b>'}<br><button class="small" style="white-space:nowrap;margin-top:3px" data-k="${esc(g.name)}" onclick="setGoods(this.dataset.k,'last',todayYmd())">✓ 今日買った</button></td></tr>`).join('')}</table>
+      <div class="hint">周期の初期値は1人暮らしの一般的な使用量の目安です。使う量に合わせて日数を直してください。黄色＝今週買う物（買い物リストに入ります）。</div>` : '');
 }
 function menuText(name) {
-  const m = getColl('clients')[docId(name)]?.menu; if (!m) return '';
-  return `【${name} 様　献立（1人分）】\n` + m.plan.map(p => `${DAYS[p.dow]}　${p.meal}：${p.dishes.join('・')}${p.amounts ? `\n　　${p.amounts.join('／')}` : ''}`).join('\n') + '\n\n【買い物リスト】\n' + Object.entries(m.list).map(([c, xs]) => `${c}：${xs.join('、')}`).join('\n');
+  const m = getColl('clients')[docId(name)]?.menu, due = goodsDueText(name); if (!m && !due) return '';
+  return (m ? `【${name} 様　献立（1人分）】\n` + m.plan.map(p => `${DAYS[p.dow]}　${p.meal}：${p.dishes.join('・')}${p.amounts ? `\n　　${p.amounts.join('／')}` : ''}`).join('\n') + '\n\n' : '') + '【買い物リスト】\n' + (m ? Object.entries(m.list).map(([c, xs]) => `${c}：${xs.join('、')}`).join('\n') : '') + (due ? `\n日用品（今週）：${due}` : '');
 }
 function copyMenu(btn) { const t = menuText((state.name || '').trim()); if (!t) { alert('先に「献立と買い物リストを作成」を押してください'); return; } copyText(t, btn); }
 // 記録の「調理」の文に、その曜日・食事の献立を入れる
@@ -1069,6 +1101,10 @@ async function saveRecords(opt = {}) {
   const rows = recRows.filter(r => r.on);
   if (!name || !rows.length) { if (!opt.quiet) alert('保存する記録がありません（「記録を生成」してチェックを入れてください）'); return; }
   if (!opt.quiet && !dupConfirm()) return;
+  // 記録に買った日用品が書いてあれば「前回買った日」を更新
+  { const c = getColl('clients')[docId(name)] || { name }, g = { ...(c.goods || {}) }; let ch = false;
+    rows.forEach(r => { if (!/買|購入/.test(r.text || '')) return; Object.keys(GOODS_CYCLE).forEach(x => { const key = x.split(/[（・]/)[0]; if ((r.text || '').includes(key) && (!g[x]?.last || g[x].last < ymd(r.date))) { g[x] = { ...(g[x] || {}), last: ymd(r.date) }; ch = true; } }); });
+    if (ch) await putDoc('clients', docId(name), { ...c, name, goods: g, updatedAt: new Date().toISOString() }); }
   const byMonth = {};
   rows.forEach(r => { const k = ymd(r.date).slice(0, 7); (byMonth[k] = byMonth[k] || []).push(r); });
   let n = 0, ok = true;
