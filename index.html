@@ -379,6 +379,7 @@
         <button onclick="if(dupConfirm()){saveRecords({quiet:true});window.print()}">🖨 印刷</button>
         <button onclick="if(event.shiftKey)paperSelfTest();else document.getElementById('paperFile').click()">📄 紙(PDF)から取込</button>
       </div>
+      <label style="display:flex;align-items:center;gap:6px;font-weight:normal;margin:2px 0 4px"><input type="checkbox" id="docxChk" style="width:auto" onchange="lsSet('smilewan_docxchk',this.checked?'1':'0')"> Word・PDFにチェック項目（顔色・実施項目など）も入れる</label>
       <input type="file" id="paperFile" accept="application/pdf,image/*" style="display:none" onchange="importPaper(this)">
       <div id="paperStatus" class="hint" style="display:none"></div>
       <label>利用者（保存済みから選択）</label>
@@ -504,7 +505,7 @@
         <li>行ごとに確認・修正する
           <ul>
             <li><b>実施項目</b>：カイポケでチェックする項目が青く選ばれている。押すと外れ、「＋項目」でカイポケと同じ並びの一覧から足せる</li>
-            <li><b>チェック欄</b>：記録の右の「チェック」列に、記録欄の値（顔色・発汗・体温・血圧…）と、チェックした実施項目をカイポケと同じ並びで ☑ 表示（PDF・印刷にも出る）。「✎ 項目」で選び直し、「📝 記録欄」で数字を入れる。「📋」でカイポケ用にコピー</li>
+            <li><b>チェック欄</b>：記録の右の「チェック」列に、記録欄の値（顔色・発汗・体温・血圧…）と、チェックした実施項目をカイポケと同じ並びで ☑ 表示（PDF・印刷・Wordにも出る。Wordでは各記録の下に小さい灰色の1行「チェック：…」。いらないときは「Word・PDFにチェック項目も入れる」を外す）。「✎ 項目」で選び直し、「📝 記録欄」で数字を入れる。「📋」でカイポケ用にコピー</li>
             <li><b>📝記録欄</b>：カイポケの欄（顔色・発汗・体温・血圧・排尿／排便の回数・量・食事量・水分cc・部分浴・清拭・整容・買物の金額と内訳・その他・予定の変更・加算）。入れた数字は文章に自動で書き足され、消すと文章からも消える。文章に書いた体温・血圧・排尿／排便・食事量・水分cc・清拭・整容・金額なども自動で欄に入る（点線。文章を打っている途中でも反映）。押せば選び直せる</li>
             <li><b>🛒 買い物タブ</b>：利用者を選んで「🍱 献立と買い物リストを作る」。買い物リストはチェックしながら使える（チェックは保存され、他の端末でも同じ）。日用品にチェックすると「今日買った」になる。周期の設定は下の「⚙ 日用品の買う周期」を開く。「LINE用にコピー」「印刷」もある。</li>
             <li><b>🍱 献立・買い物リスト</b>：予定表の調理の曜日・食事ごとに献立を作り、材料をまとめた買い物リストも作る。アセスメントの病名（高血圧→減塩、糖尿病→糖質控えめ）・義歯（やわらかい料理）・調理の力（障害→簡単な料理）と、「食べられない物」欄・NGの言葉を外して作る。献立には1人分の量（例：豚肉80g・玉ねぎ1/2個、ご飯1膳150g）が付き、買い物リストは1週間の合計量（買う単位に切り上げ）と米の合数、生活に必要な日用品（予定表の支援・アセスメントから：洗剤・トイレットペーパー・おむつ・入れ歯洗浄剤など）も出る。作った献立は記録の「調理」の文に入る。日用品は「買う周期（日）」と「前回買った日」を利用者ごとに持ち、今週買う時期の物だけ買い物リストに入る（周期の初期値は1人暮らしの目安。「✓今日買った」か、記録に「購入品：トイレットペーパー」などと書いて保存すると前回買った日が更新される）</li>
@@ -1680,6 +1681,7 @@ function setMode(m) {
     }
     refreshStaffSelect();
     try { const ms = lsGet('smilewan_minsent'); if (ms) document.getElementById('recMinSent').value = ms; } catch {}
+    document.getElementById('docxChk').checked = lsGet('smilewan_docxchk') !== '0';
     renderRecordView();
   }
 }
@@ -2041,6 +2043,10 @@ function recCheckRow(r, i) {
       <button class="small" onclick="openVPop(${i},this)">📝 記録欄（体温・血圧・排泄・食事・金額）</button>
       <button class="small" onclick="copyText(kaipokeText(recRows[${i}]),this)">📋 カイポケ用にコピー</button></div>
   </div></td></tr>`;
+}
+function checkText(r) {
+  const kp = kpOf(r), f = kpFieldsLine(r).replace(/<[^>]+>/g, ''), g = KP.map(([c, items]) => { const on = items.filter(it => kp.includes(c + '|' + it)); return on.length ? `${c} ${on.map(x => '☑' + x).join(' ')}` : ''; }).filter(Boolean);
+  return [f, ...g].join('／');
 }
 function kaipokeText(r) {
   const kp = kpOf(r), x = [vSummary(r)];
@@ -2883,7 +2889,7 @@ async function exportRecordsDocx() {
     const D = window.docx;
     const name = (state.name || '').trim(), flat = name.replace(/[\s　]+/g, '');
     const kubun = document.getElementById('recKubun').value;
-    const FONT = window._docxFont || '游明朝';
+    const FONT = window._docxFont || '游明朝', withChk = document.getElementById('docxChk').checked;
     const run = (text, bold, brk) => new D.TextRun({ text, bold, break: brk ? 1 : 0, font: { eastAsia: FONT, ascii: FONT, hAnsi: FONT }, size: 21 });
     // 日付の早い順、同じ日は時刻順
     const sorted = [...rows].sort((a, b) => (a.date - b.date) || (a.e.start || '').localeCompare(b.e.start || ''));
@@ -2893,7 +2899,10 @@ async function exportRecordsDocx() {
       const head = `${d.date.getMonth() + 1}月${d.date.getDate()}日（${DAYS[d.date.getDay()]}）`;
       const firstLine = kubun === '介護' ? `　　　　　　　${flat}　介護` : `　${flat}`;
       children.push(new D.Paragraph({ children: [run(head, true), ...(i === 0 ? [run(firstLine, true)] : [])] }));
-      d.rows.forEach(r => children.push(new D.Paragraph({ children: [run(`【${recLabel(r)}】`, true), run(String(r.text || '').replace(/\n/g, ''), false, true)] })));
+      d.rows.forEach(r => {
+        children.push(new D.Paragraph({ children: [run(`【${recLabel(r)}】`, true), run(String(r.text || '').replace(/\n/g, ''), false, true)] }));
+        if (withChk) children.push(new D.Paragraph({ children: [new D.TextRun({ text: 'チェック：' + checkText(r), font: { eastAsia: FONT, ascii: FONT, hAnsi: FONT }, size: 17, color: '555555' })] }));
+      });
       if (i < days.length - 1) children.push(new D.Paragraph({ children: [] }));
     });
     const doc = new D.Document({
@@ -2924,10 +2933,10 @@ async function exportRecordsPdf() {
   const host = document.createElement('div');
   host.style.cssText = 'position:fixed;left:-10000px;top:0;';
   document.body.appendChild(host);
-  const cell = 'border:1px solid #555;padding:5px 7px;vertical-align:top;text-align:left;';
-  const head = `<tr style="background:#eee;font-weight:bold"><td style="${cell}width:108px">日時</td><td style="${cell}width:60px">担当</td><td style="${cell}width:70px">種別</td><td style="${cell}">記録</td><td style="${cell}width:168px">チェック</td></tr>`;
+  const cell = 'border:1px solid #555;padding:5px 7px;vertical-align:top;text-align:left;', withChk = document.getElementById('docxChk').checked;
+  const head = `<tr style="background:#eee;font-weight:bold"><td style="${cell}width:108px">日時</td><td style="${cell}width:60px">担当</td><td style="${cell}width:70px">種別</td><td style="${cell}">記録</td>${withChk ? `<td style="${cell}width:168px">チェック</td>` : ''}</tr>`;
   const chkHtml = r => `<div style="font-size:9.5px;line-height:1.45;color:#333">${kpFieldsLine(r).replace(/<span/g, '<span style="display:inline-block;margin-right:5px;white-space:nowrap"').replace(/ class="warn">/g, '>⚠')}</div><div style="font-size:10px;line-height:1.5;margin-top:3px">${kpLinesHtml(r).replace(/<b>/g, '<b style="font-weight:normal;color:#555">').replace(/<i>/g, '<span style="display:inline-block;margin-right:6px;white-space:nowrap">').replace(/<\/i>/g, '</span>')}</div>`;
-  const rowHtml = r => `<tr><td style="${cell}white-space:nowrap">${String(r.date.getMonth() + 1).padStart(2, '0')}/${String(r.date.getDate()).padStart(2, '0')}（${DAYS[r.date.getDay()]}）<br>${esc(r.e.start || '--:--')} - ${esc(r.e.end || '--:--')}</td><td style="${cell}">${esc(r.staff)}</td><td style="${cell}">${esc(r.kind)}</td><td style="${cell}line-height:1.55;white-space:pre-wrap">${esc(r.text)}</td><td style="${cell}">${chkHtml(r)}</td></tr>`;
+  const rowHtml = r => `<tr><td style="${cell}white-space:nowrap">${String(r.date.getMonth() + 1).padStart(2, '0')}/${String(r.date.getDate()).padStart(2, '0')}（${DAYS[r.date.getDay()]}）<br>${esc(r.e.start || '--:--')} - ${esc(r.e.end || '--:--')}</td><td style="${cell}">${esc(r.staff)}</td><td style="${cell}">${esc(r.kind)}</td><td style="${cell}line-height:1.55;white-space:pre-wrap">${esc(r.text)}</td>${withChk ? `<td style="${cell}">${chkHtml(r)}</td>` : ''}</tr>`;
   const newPage = () => {
     const pg = document.createElement('div');
     pg.style.cssText = `width:${W}px;height:${H}px;padding:${PAD}px;box-sizing:border-box;background:#fff;color:#000;font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic","Meiryo",sans-serif;font-size:13px;position:relative;`;
