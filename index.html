@@ -149,7 +149,23 @@
   .rec-table td.dt input:hover, .rec-table td.dt input:focus { border-color: var(--line); }
   .rec-table td.staff select { width: auto; max-width: 9em; font: inherit; font-size: 12px; padding: 2px 2px; border: 1px solid transparent; border-radius: 3px; background: transparent; }
   .rec-table td.staff select:hover, .rec-table td.staff select:focus { border-color: var(--line); background: var(--input); }
-  .rec-table td.kind { min-width: 15em; }
+  .rec-table td.kind { min-width: 8em; }
+  .rec-table tr.kprow td { border-top: none; background: var(--soft, rgba(127,127,127,.05)); padding: 6px 8px 8px; }
+  .rec-table tr.main td { border-bottom: none; }
+  .kpbox { display: flex; flex-direction: column; gap: 6px; }
+  .kpf { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 13px; }
+  .kpf span { white-space: nowrap; }
+  .kpf b { color: var(--muted); font-weight: normal; margin-right: 3px; }
+  .kpf .warn { color: var(--danger); font-weight: bold; }
+  .kpg-wrap { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+  .kpg { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; }
+  .kpg > b { font-size: 11px; color: var(--muted); margin-right: 2px; }
+  .kpg .chip { font-size: 12px; padding: 2px 9px; }
+  .kpg .chip.on::before { content: '☑ '; }
+  .kpg .chip:not(.on) { opacity: .55; }
+  .kpg .chip:not(.on)::before { content: '☐ '; }
+  .kp-act { display: flex; gap: 6px; flex-wrap: wrap; }
+  @media print { .kp-act { display: none; } .kpg .chip:not(.on) { display: none; } }
   .rec-table td.txt { width: 52%; }
   .rec-table td.txt textarea { width: 100%; min-height: 58px; font: inherit; font-size: 13px; line-height: 1.45; padding: 4px 6px; border: 1px solid transparent; border-radius: 3px; resize: vertical; background: transparent; color: var(--text); }
   .rec-table td.txt textarea:hover, .rec-table td.txt textarea:focus { border-color: var(--line); }
@@ -479,6 +495,7 @@
         <li>行ごとに確認・修正する
           <ul>
             <li><b>実施項目</b>：カイポケでチェックする項目が青く選ばれている。押すと外れ、「＋項目」でカイポケと同じ並びの一覧から足せる</li>
+            <li><b>カイポケのチェック項目</b>：各記録のすぐ下の行に、記録欄の値（顔色・発汗・体温・血圧…）と、チェックした実施項目をカイポケと同じ並びで ☑ 表示。押すと外れる。「☐ すべての項目を表示」で全項目が出て、押して選べる。「📋 カイポケ用にコピー」もある</li>
             <li><b>📝記録欄</b>：カイポケの欄（顔色・発汗・体温・血圧・排尿／排便の回数・量・食事量・水分cc・部分浴・清拭・整容・買物の金額と内訳・その他・予定の変更・加算）。入れた数字は文章に自動で書き足され、消すと文章からも消える。文章に書いた体温・血圧・排尿／排便・食事量・水分cc・清拭・整容・金額なども自動で欄に入る（点線。文章を打っている途中でも反映）。押せば選び直せる</li>
             <li><b>🛒 買い物タブ</b>：利用者を選んで「🍱 献立と買い物リストを作る」。買い物リストはチェックしながら使える（チェックは保存され、他の端末でも同じ）。日用品にチェックすると「今日買った」になる。周期の設定は下の「⚙ 日用品の買う周期」を開く。「LINE用にコピー」「印刷」もある。</li>
             <li><b>🍱 献立・買い物リスト</b>：予定表の調理の曜日・食事ごとに献立を作り、材料をまとめた買い物リストも作る。アセスメントの病名（高血圧→減塩、糖尿病→糖質控えめ）・義歯（やわらかい料理）・調理の力（障害→簡単な料理）と、「食べられない物」欄・NGの言葉を外して作る。献立には1人分の量（例：豚肉80g・玉ねぎ1/2個、ご飯1膳150g）が付き、買い物リストは1週間の合計量（買う単位に切り上げ）と米の合数、生活に必要な日用品（予定表の支援・アセスメントから：洗剤・トイレットペーパー・おむつ・入れ歯洗浄剤など）も出る。作った献立は記録の「調理」の文に入る。日用品は「買う周期（日）」と「前回買った日」を利用者ごとに持ち、今週買う時期の物だけ買い物リストに入る（周期の初期値は1人暮らしの目安。「✓今日買った」か、記録に「購入品：トイレットペーパー」などと書いて保存すると前回買った日が更新される）</li>
@@ -1965,6 +1982,41 @@ function toggleKP(i, key) {
   renderRecordView(); markRecDirty();
   if (kpPopRow === i) renderKpPop(i);
 }
+// 記録の下に出す「カイポケのチェック項目」：記録欄の値＋実施項目（カイポケと同じ並び）
+function kpFieldsHtml(r) {
+  const v = vOf(r), x = [], f = (k, val, warn) => x.push(`<span${warn ? ' class="warn"' : ''}><b>${k}</b>${esc(val)}</span>`);
+  if (v.変更 === '有') f('予定の変更', '有', 1); if ((v.加算 || []).length) f('特定加算', v.加算.join('・'), 1);
+  f('顔色', v.顔色, v.顔色 === '不良'); f('発汗', v.発汗, v.発汗 === '有');
+  if (v.体温) f('体温', v.体温 + '℃'); if (v.血圧上) f('血圧', `${v.血圧上}/${v.血圧下 || ''}mmHg`);
+  if (v.排尿回数 || v.排尿量) f('排尿', `${v.排尿回数 ? v.排尿回数 + '回' : ''}${v.排尿量 ? ' ' + v.排尿量 + 'cc' : ''}`);
+  if (v.排便回数 || v.排便状態) f('排便', `${v.排便回数 ? v.排便回数 + '回' : ''}${v.排便状態 ? ' ' + v.排便状態 : ''}`);
+  if (v.摂食) f('摂食介助', v.摂食); if (v.食事量) f('食事量', v.食事量); if (v.水分) f('水分補給', v.水分 + 'cc');
+  if (v.部分浴) f('部分浴', v.部分浴); if (v.清拭) f('清拭', v.清拭); if ((v.整容 || []).length) f('整容', v.整容.join('・'));
+  if (v.預り) f('預り', v.預り + '円'); if (v.購入) f('購入', v.購入 + '円'); if (v.お釣) f('お釣', v.お釣 + '円'); if (v.内訳) f('内訳', v.内訳);
+  f('その他', (v.その他 || []).join('・') || 'なし');
+  return x.join('');
+}
+function kpGroupsHtml(r, i) {
+  const kp = kpOf(r), all = !!r.showAllKp;
+  return KP.map(([c, items]) => {
+    const on = items.filter(it => kp.includes(c + '|' + it)); if (!on.length && !all) return '';
+    return `<span class="kpg"><b>${c}</b>${(all ? items : on).map(it => { const k = c + '|' + it; return `<span class="chip ${kp.includes(k) ? 'on' : ''}" data-k="${esc(k)}" onclick="toggleKP(${i},this.dataset.k)">${esc(it)}</span>`; }).join('')}</span>`;
+  }).join('') || '<span class="hint" style="margin:0">実施項目なし（「すべての項目を表示」から選べます）</span>';
+}
+function recCheckRow(r, i) {
+  return `<tr class="kprow ${r.on ? '' : 'off'}"><td class="chk"></td><td colspan="5"><div class="kpbox">
+    <div class="kpf" id="kpf${i}">${kpFieldsHtml(r)}</div>
+    <div class="kpg-wrap">${kpGroupsHtml(r, i)}</div>
+    <div class="kp-act"><button class="small" onclick="recRows[${i}].showAllKp=!recRows[${i}].showAllKp;renderRecordView()">${r.showAllKp ? '選んだ項目だけ表示' : '☐ すべての項目を表示'}</button>
+      <button class="small" onclick="openVPop(${i},this)">📝 記録欄（体温・血圧・排泄・食事・金額）</button>
+      <button class="small" onclick="copyText(kaipokeText(recRows[${i}]),this)">📋 カイポケ用にコピー</button></div>
+  </div></td></tr>`;
+}
+function kaipokeText(r) {
+  const kp = kpOf(r), x = [vSummary(r)];
+  KP.forEach(([c, items]) => { const on = items.filter(it => kp.includes(c + '|' + it)); if (on.length) x.push(`${c}：${on.join('・')}`); });
+  return x.join('\n');
+}
 function recItemChips(r, i) {
   const kp = kpOf(r);
   return `<div class="chips rec-items">${kp.map(k => { const [c, it] = k.split('|'); return `<span class="chip on" title="${esc(c)}" data-k="${esc(k)}" onclick="toggleKP(${i},this.dataset.k)">${esc(c === '清掃' || c === '自立支援' || c === '洗濯' || c === '調理' ? c + '：' + it : it)}</span>`; }).join('')}
@@ -2078,7 +2130,7 @@ function vSummary(r) {
 }
 let vPopRow = -1;
 function liveV(i, ta) {  // 入力中にまとめ・記録欄を更新（文章欄はそのまま）
-  const sum = ta.closest('tr')?.querySelector('.vsum'); if (sum) sum.textContent = vSummary(recRows[i]);
+  const f = document.getElementById('kpf' + i); if (f) f.innerHTML = kpFieldsHtml(recRows[i]);
   if (vPopRow === i) renderVPop(i);
 }
 function setVin(i, k, val) {
@@ -2564,18 +2616,18 @@ function renderRecordView() {
   const ngIdx = new Set(ngRows());
   v.innerHTML = (ngIdx.size ? `<div class="ng-alert">⚠ NG表現（「変化なし」「お変わりない」など）を含む行が ${ngIdx.size}行あります。橙色の行を「↻」で作り直すか、具体的な様子に書き換えてください。</div>` : '') + (groups.length ? `<div class="dup-alert">⚠ 同じ文章の行が ${groups.length}組（${dupCount}行）あります。赤い行の「↻」で言い換えるか、文章を編集してください。</div>` : '') + `<h2><span>訪問記録　${esc(state.name)} 様</span><small>${recRows.length}件中 ${n}件を出力　<a href="#" onclick="recRows.forEach(r=>r.on=true);renderRecordView();return false">全選択</a>／<a href="#" onclick="recRows.forEach(r=>r.on=false);renderRecordView();return false">全解除</a></small></h2>
   <table class="rec-table"><tr><th class="chk"></th><th>日時</th><th>担当</th><th>種別</th><th>記録</th><th class="act"></th></tr>
-  ${recRows.map((r, i) => `<tr class="${r.on ? '' : 'off'} ${dupIdx.has(i) ? 'dup' : ''} ${ngIdx.has(i) ? 'ng' : ''}">
+  ${recRows.map((r, i) => `<tr class="main ${r.on ? '' : 'off'} ${dupIdx.has(i) ? 'dup' : ''} ${ngIdx.has(i) ? 'ng' : ''}">
     <td class="chk"><input type="checkbox" ${r.on ? 'checked' : ''} onchange="recRows[${i}].on=this.checked;renderRecordView()"></td>
     <td class="dt">${String(r.date.getMonth() + 1).padStart(2, '0')} / ${String(r.date.getDate()).padStart(2, '0')}（${DAYS[r.date.getDay()]}）<br>
       <input type="time" value="${esc(r.e.start)}" onchange="recRows[${i}].e.start=this.value"> - <input type="time" value="${esc(r.e.end)}" onchange="recRows[${i}].e.end=this.value">
       ${r.flag ? `<span class="flag">${esc(r.flag)}</span>` : ''}</td>
     <td class="staff"><select onchange="recRows[${i}].staff=this.value;recRows[${i}].staffEdited=true">${staffOptions(r.staff)}</select></td>
-    <td class="kind">${r.kind}<br><small style="color:var(--muted)">${esc(r.e.type)}</small>${recItemChips(r, i)}</td>
+    <td class="kind">${r.kind}<br><small style="color:var(--muted)">${esc(r.e.type)}</small></td>
     <td class="txt">${ngIdx.has(i) ? ngHits(r.text).map(w => `<span class="ng-badge">NG「${esc(w)}」</span>`).join('') : ''}${dupIdx.has(i) ? `<span class="dup-badge">⚠ 同じ文章（${dupIdx.get(i)}）</span>` : ''}<textarea oninput="recRows[${i}].text=this.value;liveV(${i},this)" onchange="kpFromText(recRows[${i}]);renderRecordView();markRecDirty()">${esc(r.text)}</textarea></td>
     <td class="act"><button class="small" title="別の言い回し" onclick="recRows[${i}].text=uniqueText(recRows[${i}],recRows.filter((_,j)=>j!==${i}));renderRecordView()">↻</button>
       <button class="small" title="文章をコピー" onclick="copyText(recRows[${i}].text,this)">📋</button><br>
       <button class="small" title="感情・状態を選んで文に追加" style="margin-top:4px" onclick="openStatePop(${i},this)">😊様子</button></td>
-  </tr>`).join('')}</table>`;
+  </tr>${recCheckRow(r, i)}`).join('')}</table>`;
 }
 
 
