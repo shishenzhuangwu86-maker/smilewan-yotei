@@ -438,7 +438,7 @@
           <ul>
             <li><b>実施項目</b>：カイポケでチェックする項目が青く選ばれている。押すと外れ、「＋項目」でカイポケと同じ並びの一覧から足せる</li>
             <li><b>📝記録欄</b>：カイポケの欄（顔色・発汗・体温・血圧・排尿／排便の回数・量・食事量・水分cc・部分浴・清拭・整容・買物の金額と内訳・その他・予定の変更・加算）。入れた数字は文章に自動で書き足され、消すと文章からも消える。文章に書いた体温・血圧・排尿／排便・食事量・水分cc・清拭・整容・金額なども自動で欄に入る（点線。文章を打っている途中でも反映）。押せば選び直せる</li>
-            <li><b>🍱 献立・買い物リスト</b>（利用者情報の中）：予定表の調理の曜日・食事ごとに献立を作り、材料をまとめた買い物リストも作る。アセスメントの病名（高血圧→減塩、糖尿病→糖質控えめ）・義歯（やわらかい料理）・調理の力（障害→簡単な料理）と、「食べられない物」欄・NGの言葉を外して作る。作った献立は記録の「調理」の文に入る</li>
+            <li><b>🍱 献立・買い物リスト</b>（利用者情報の中）：予定表の調理の曜日・食事ごとに献立を作り、材料をまとめた買い物リストも作る。アセスメントの病名（高血圧→減塩、糖尿病→糖質控えめ）・義歯（やわらかい料理）・調理の力（障害→簡単な料理）と、「食べられない物」欄・NGの言葉を外して作る。献立には1人分の量（例：豚肉80g・玉ねぎ1/2個、ご飯1膳150g）が付き、買い物リストは1週間の合計量（買う単位に切り上げ）と米の合数、生活に必要な日用品（予定表の支援・アセスメントから：洗剤・トイレットペーパー・おむつ・入れ歯洗浄剤など）も出る。作った献立は記録の「調理」の文に入る</li>
             <li><b>記録の文章</b>：直接書き換えられる。「↻」で別の言い回し</li>
             <li><b>様子</b>：「😊様子」で一文を足す（★はアセスメントからのおすすめ）</li>
             <li>出力しない行は左のチェックを外す</li>
@@ -939,7 +939,36 @@ const DISH = {
     ['なめこ汁', ['なめこ', '味噌'], '簡'], ['豚汁', ['豚肉', '大根', 'にんじん', 'ごぼう', '味噌'], ''],
   ],
 };
-const SHOP_CAT = [['肉・魚', /肉|豚|牛|鶏|鮭|さば|たら|ぶり|かれい|えび|ハム|ツナ/], ['卵・乳・豆腐', /卵|牛乳|豆腐|納豆|油揚げ/], ['野菜・きのこ', /玉ねぎ|にんじん|じゃがいも|キャベツ|もやし|ピーマン|大根|白菜|長ねぎ|ほうれん草|小松菜|かぼちゃ|ごぼう|きゅうり|トマト|なす|ブロッコリー|冬瓜|しめじ|なめこ|しょうが/], ['乾物・その他', /./]];
+const SHOP_CAT = [['肉・魚', /肉|ロース|鮭|さば|たら|ぶり|かれい|えび|ハム|ツナ/], ['卵・乳・豆腐', /卵|牛乳|豆腐|納豆|油揚げ/], ['野菜・きのこ', /玉ねぎ|にんじん|じゃがいも|キャベツ|もやし|ピーマン|大根|白菜|長ねぎ|ほうれん草|小松菜|かぼちゃ|ごぼう|きゅうり|トマト|なす|ブロッコリー|冬瓜|しめじ|なめこ|しょうが/], ['乾物・その他', /./]];
+// 1人分の量の目安（[量, 単位]）。載っていない物は調味料・乾物として「在庫を確認」
+const QTY = {
+  豚肉: [80, 'g'], 豚ロース: [80, 'g'], 牛肉: [70, 'g'], 鶏もも肉: [100, 'g'], 鶏むね肉: [100, 'g'], 合いびき肉: [80, 'g'], 豚ひき肉: [60, 'g'], 鶏ひき肉: [80, 'g'],
+  生鮭: [1, '切れ'], さば: [1, '切れ'], たら: [1, '切れ'], ぶり: [1, '切れ'], かれい: [1, '切れ'], えび: [6, '尾'], ハム: [2, '枚'], ツナ缶: [0.5, '缶'],
+  卵: [1, '個'], 牛乳: [50, 'ml'], 豆腐: [0.5, '丁'], 納豆: [1, 'パック'], 油揚げ: [0.5, '枚'],
+  じゃがいも: [1, '個'], 玉ねぎ: [0.5, '個'], にんじん: [0.33, '本'], キャベツ: [100, 'g'], もやし: [0.5, '袋'], ピーマン: [1, '個'], 大根: [100, 'g'], 白菜: [100, 'g'],
+  長ねぎ: [0.33, '本'], ほうれん草: [0.33, '束'], 小松菜: [0.33, '束'], かぼちゃ: [100, 'g'], ごぼう: [0.33, '本'], きゅうり: [0.5, '本'], トマト: [1, '個'], なす: [1, '本'],
+  ブロッコリー: [0.33, '株'], 冬瓜: [100, 'g'], しめじ: [0.5, 'パック'], なめこ: [0.5, '袋'], しょうが: [1, 'かけ'], トマト缶: [0.5, '缶'],
+};
+const fracTxt = x => { const r = Math.round(x * 6) / 6, w = Math.floor(r + 1e-9), f = r - w, F = [[1 / 6, '1/6'], [1 / 4, '1/4'], [1 / 3, '1/3'], [1 / 2, '1/2'], [2 / 3, '2/3'], [3 / 4, '3/4'], [5 / 6, '5/6']].reduce((b, c) => Math.abs(c[0] - f) < Math.abs(b[0] - f) ? c : b, [0, '']); return f < 0.08 ? String(w || 1) : (w ? w + 'と' : '') + F[1]; };
+const qtyTxt = (x, u) => u === 'g' || u === 'ml' ? Math.round(x / 10) * 10 + u : fracTxt(x) + u;
+// 生活に必要な物（予定表の支援・アセスメントから。在庫を見て足りない物だけ買う）
+function dailyGoods(name) {
+  const c = getColl('clients')[docId(name)] || {}, a = c.assessment || {};
+  const t = [1, 2, 3, 4, 5, 6, 0].flatMap(d => dayEntries(state.days[d]) || []).map(e => (e.type || '') + ' ' + (e.detail || '') + ' ' + autoKP(e).join(' ')).join(' ') + ' ' + JSON.stringify(a) + ' ' + (c.memo || '');
+  const g = [['トイレットペーパー', 1], ['ティッシュ', 1], ['ゴミ袋', 1]];
+  if (/調理|食事|朝食|昼食|夕食|配膳/.test(t)) g.push(['食器用洗剤', 1], ['スポンジ', 1], ['ラップ', 1]);
+  if (/洗濯/.test(t)) g.push(['洗濯用洗剤', 1]);
+  if (/掃除|清掃/.test(t)) g.push(['住居用洗剤', 1]);
+  if (/トイレ(の)?(清掃|掃除)|清掃\|トイレ/.test(t)) g.push(['トイレ用洗剤', 1]);
+  if (/入浴|シャワー|洗髪/.test(t)) g.push(['シャンプー・ボディソープ', 1]);
+  if (/おむつ|オムツ|紙パンツ/.test(t)) g.push(['紙パンツ（おむつ）', 1]);
+  if (/パッド/.test(t)) g.push(['尿取りパッド', 1]);
+  if (/陰部|おむつ|オムツ|パッド/.test(t)) g.push(['おしりふき', 1]);
+  if (/口腔|歯磨き/.test(t)) g.push(['歯磨き粉', 1]);
+  if (a.dentures || /義歯|入れ歯/.test(t)) g.push(['入れ歯洗浄剤', 1]);
+  if (/服薬|薬/.test(t)) g.push(['お薬カレンダー用の袋・ケース', 0]);
+  return g.filter(([, on]) => on).map(([x]) => x);
+}
 // 予定表から「調理がある曜日×食事」を拾う
 function menuSlots() {
   const out = [];
@@ -966,9 +995,10 @@ function menuRules(name) {
   if (a.dentures || /義歯|入れ歯|嚥下|むせ|刻み|とろみ/.test(all)) { avoid.add('硬'); avoid.add('揚'); notes.push('義歯・嚥下→やわらかく食べやすい料理'); }
   const easy = /簡単な調理|温め|調理の際は支援|長時間台所/.test(all) || kubunOf(name) === '障害';
   if (easy) notes.push('障害・簡単な調理→本人と一緒に作りやすい簡単な料理を多めに');
-  if (/食欲低下|食事量を摂取することが難しい|適量を食事/.test(all)) notes.push('食事量→少なめでも食べやすい料理に');
+  const small = /食欲低下|食事量を摂取することが難しい|適量を食事|少食/.test(all);
+  if (small) notes.push('食事量→量を少なめ（7割）に');
   if (ng.length) notes.push('外す食材・言葉：' + ng.join('、'));
-  return { avoid, ng, notes, easy };
+  return { avoid, ng, notes, easy, factor: small ? 0.7 : 1 };
 }
 function dishOk(d, R) {
   const [nm, ing, tg] = d, text = nm + ' ' + ing.join(' ');
@@ -993,12 +1023,18 @@ function makeMenu() {
     const lowSalt = R.avoid.has('塩'), soupToday = lowSalt && plan0.some(x => x.dow === sl.dow && x.soup);
     const soup = lowSalt && (sl.meal === '朝食' || soupToday) ? null : take('汁物', lowSalt ? [...mainIng, '味噌'] : mainIng);
     plan0.push({ dow: sl.dow, soup: !!soup });
-    return { ...sl, dishes: ['ご飯', main?.[0], sl.meal === '朝食' ? null : side?.[0], soup?.[0]].filter(Boolean), ing: [main, side && sl.meal !== '朝食' ? side : null, soup].filter(Boolean).flatMap(d => d[1]) };
+    const ds = [main, sl.meal === '朝食' ? null : side, soup].filter(Boolean);
+    const amt = d => d[1].filter(x => QTY[x] && !R.ng.some(w => x.includes(w))).map(x => x + qtyTxt(QTY[x][0] * R.factor, QTY[x][1])).join('・');
+    return { ...sl, dishes: ['ご飯', ...ds.map(d => d[0])], amounts: [`ご飯（${R.factor < 1 ? '軽く' : ''}1膳 約${Math.round(150 * R.factor)}g）`, ...ds.map(d => `${d[0]}（${amt(d) || '調味料のみ'}）`)], ing: ds.flatMap(d => d[1]) };
   });
-  const cnt = {}; plan.forEach(p => p.ing.forEach(x => { if (!R.ng.some(w => x.includes(w))) cnt[x] = (cnt[x] || 0) + 1; }));
-  cnt['米（残りを確認）'] = 1;
+  const cnt = {}, tot = {}, stock = new Set();
+  plan.forEach(p => p.ing.forEach(x => { if (R.ng.some(w => x.includes(w))) return; if (QTY[x]) { cnt[x] = (cnt[x] || 0) + 1; tot[x] = (tot[x] || 0) + QTY[x][0] * R.factor; } else stock.add(x); }));
   const list = {}; SHOP_CAT.forEach(([c]) => { list[c] = []; });
-  Object.entries(cnt).forEach(([x, n]) => { const c = SHOP_CAT.find(([, re]) => re.test(x))[0]; list[c].push(n > 1 ? `${x}（${n}回分）` : x); });
+  Object.entries(cnt).forEach(([x, n]) => { const c = SHOP_CAT.find(([, re]) => re.test(x))[0]; const u = QTY[x][1], buy = u === 'g' || u === 'ml' ? qtyTxt(Math.ceil(tot[x] / 10) * 10, u) : Math.ceil(tot[x] - 0.05) + u;  // 買うときは切り上げ
+    list[c].push(`${x} ${buy}${n > 1 ? `（${n}回分）` : ''}`); });
+  const rice = plan.length * 150 * R.factor; // 炊いたご飯150g ≒ 米0.45合
+  list['乾物・その他'].push(`米 約${(Math.ceil(rice / 330 * 2) / 2).toFixed(1).replace('.0', '')}合（${plan.length}食分・残りを確認）`, ...[...stock].map(x => x + '（在庫を確認）'));
+  list['日用品（在庫を見て足りない物）'] = dailyGoods(name).filter(x => !R.ng.some(w => x.includes(w)) && !ngHits(x).length);
   Object.keys(list).forEach(c => { if (!list[c].length) delete list[c]; });
   if (R.avoid.has('塩')) R.notes.push('汁物は1日1回まで（減塩）');
   const doc = getColl('clients')[docId(name)] || { name };
@@ -1011,13 +1047,13 @@ function renderMenu() {
   const name = (state.name || '').trim(), m = name && getColl('clients')[docId(name)]?.menu;
   rules.textContent = name ? '配慮：' + (menuRules(name).notes.join('／') || '特になし（アセスメントに食事の制限なし）') : '';
   if (!m) { out.innerHTML = ''; return; }
-  out.innerHTML = `<table><tr><th>曜日</th><th>食事</th><th>献立</th></tr>${m.plan.map(p => `<tr><td>${DAYS[p.dow]}</td><td>${p.meal}</td><td>${esc(p.dishes.join('・'))}</td></tr>`).join('')}</table>
+  out.innerHTML = `<table><tr><th>曜日</th><th>食事</th><th>献立（1人分の量）</th></tr>${m.plan.map(p => `<tr><td>${DAYS[p.dow]}</td><td>${p.meal}</td><td><b>${esc(p.dishes.join('・'))}</b>${p.amounts ? `<br><small style="color:var(--muted)">${esc(p.amounts.join('／'))}</small>` : ''}</td></tr>`).join('')}</table>
     <div class="shop"><b>🛒 買い物リスト</b><br>${Object.entries(m.list).map(([c, xs]) => `<b>${c}</b>${esc(xs.join('、'))}`).join('<br>')}</div>
     <div class="hint">作成日 ${m.created.slice(0, 10)}　※ 記録の「調理」の文にこの献立が入ります。冷蔵庫の残りを見て調整してください。</div>`;
 }
 function menuText(name) {
   const m = getColl('clients')[docId(name)]?.menu; if (!m) return '';
-  return `【${name} 様　献立】\n` + m.plan.map(p => `${DAYS[p.dow]}　${p.meal}：${p.dishes.join('・')}`).join('\n') + '\n\n【買い物リスト】\n' + Object.entries(m.list).map(([c, xs]) => `${c}：${xs.join('、')}`).join('\n');
+  return `【${name} 様　献立（1人分）】\n` + m.plan.map(p => `${DAYS[p.dow]}　${p.meal}：${p.dishes.join('・')}${p.amounts ? `\n　　${p.amounts.join('／')}` : ''}`).join('\n') + '\n\n【買い物リスト】\n' + Object.entries(m.list).map(([c, xs]) => `${c}：${xs.join('、')}`).join('\n');
 }
 function copyMenu(btn) { const t = menuText((state.name || '').trim()); if (!t) { alert('先に「献立と買い物リストを作成」を押してください'); return; } copyText(t, btn); }
 // 記録の「調理」の文に、その曜日・食事の献立を入れる
