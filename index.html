@@ -172,7 +172,7 @@
   #vPop input[type=number], #vPop input[type=text] { width: 64px; padding: 3px 5px; font-size: 12px; }
   #vPop .row > *, #vPop .row .chip { flex: none !important; }
   #vPop input.wide { flex: 1 1 auto !important; width: auto; }
-  #vPop .chip.auto { border-style: dashed; }
+  #vPop .chip.auto, #vPop input.auto { border-style: dashed; }
   .vsum { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
   #kpPop .cat { font-size: 11px; color: var(--muted); margin: 8px 0 3px; }
   #kpPop .head { display: flex; justify-content: space-between; align-items: center; font-size: 12px; margin-bottom: 4px; }
@@ -426,7 +426,7 @@
         <li>行ごとに確認・修正する
           <ul>
             <li><b>実施項目</b>：カイポケでチェックする項目が青く選ばれている。押すと外れ、「＋項目」でカイポケと同じ並びの一覧から足せる</li>
-            <li><b>📝記録欄</b>：カイポケの欄（顔色・発汗・体温・血圧・排尿／排便の回数・量・食事量・水分cc・部分浴・清拭・整容・買物の金額と内訳・その他・予定の変更・加算）。入れた数字は文章に自動で書き足され、消すと文章からも消える。顔色・発汗・その他・実施項目は文章から自動で入る（点線）。押せば選び直せる</li>
+            <li><b>📝記録欄</b>：カイポケの欄（顔色・発汗・体温・血圧・排尿／排便の回数・量・食事量・水分cc・部分浴・清拭・整容・買物の金額と内訳・その他・予定の変更・加算）。入れた数字は文章に自動で書き足され、消すと文章からも消える。文章に書いた体温・血圧・排尿／排便・食事量・水分cc・清拭・整容・金額なども自動で欄に入る（点線。文章を打っている途中でも反映）。押せば選び直せる</li>
             <li><b>記録の文章</b>：直接書き換えられる。「↻」で別の言い回し</li>
             <li><b>様子</b>：「😊様子」で一文を足す（★はアセスメントからのおすすめ）</li>
             <li>出力しない行は左のチェックを外す</li>
@@ -1706,11 +1706,27 @@ function openKpPop(i, btn) {
 //   ・自分で入れた欄（体温・血圧・回数・cc・金額など）＝文章に自動で書き足す
 const V_OTHER = ['環境整備', '相談援助', '情報収集・提供', '記録'];
 function vAuto(r) {
-  const t = r.text || '';
-  return {
-    変更: '無', 顔色: /顔色(が|は)?(悪|優れ|不良|すぐれ)/.test(t) ? '不良' : '良', 発汗: /発汗(が見られ|あり|有)|汗をかい/.test(t) ? '有' : '無',
-    その他: ['記録', ...(/環境を整え|整理整頓|清掃|掃除|動線|生活環境/.test(t) ? ['環境整備'] : []), ...(/相談|傾聴|不安について話|話を伺/.test(t) ? ['相談援助'] : []), ...(/報告|情報/.test(t) ? ['情報収集・提供'] : [])],
-  };
+  const t = (r.text || '').replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/，/g, ',').replace(/．/g, '.').replace(/／/g, '/'), v = {}, num = x => x && x.replace(/,/g, '');
+  const m = (...res) => { for (const re of res) { const x = t.match(re); if (x) return x.slice(1).find(Boolean) || ''; } return ''; };
+  v.変更 = /予定(の)?変更(が)?(あり|有|あった|となった)/.test(t) ? '有' : '無';
+  v.加算 = [...(/初回/.test(t) ? ['初回'] : []), ...(/緊急/.test(t) ? ['緊急'] : [])];
+  v.顔色 = /顔色(が|は)?(悪|優れ|不良|すぐれ)/.test(t) ? '不良' : '良';
+  v.発汗 = /発汗(が見られ|あり|有)|汗をかい|汗ばん/.test(t) ? '有' : '無';
+  v.体温 = m(/体温[はが]?\s*(\d{2}(?:\.\d)?)\s*(?:℃|度)/);
+  const bp = t.match(/血圧[はが]?\s*(\d{2,3})\s*[\/／~〜-]\s*(\d{2,3})/); if (bp) { v.血圧上 = bp[1]; v.血圧下 = bp[2]; }
+  v.排尿回数 = m(/排尿[はが]?\s*(\d+)\s*回/); v.排尿量 = m(/排尿[^。]*?(?:約)?(\d+)\s*(?:cc|ml|ｃｃ|ｍｌ)/i);
+  v.排便回数 = m(/排便[はが]?\s*(\d+)\s*回/); v.排便状態 = m(/排便[^。]*?[（(]([^）)]+)[）)]/, /(普通便|軟便|硬便|下痢便?|泥状便|水様便|有形便)/);
+  v.水分 = m(/水分[^。]*?(\d+)\s*(?:cc|ml|ｃｃ|ｍｌ)/i, /(\d+)\s*(?:cc|ml)[^。]*?水分/i);
+  v.食事量 = m(/食事量[はが]?\s*([^。、]+?)(?:であった|だった|。|、)/, /(?:主食|副食|食事)[はを]?\s*(\d{1,2}割)/, /(\d{1,2}割)(?:摂取|召し上が|食べ)/) || (/完食/.test(t) ? '完食' : '');
+  v.摂食 = /全介助(にて|で)?(摂取|食事)|食事[^。]*全介助/.test(t) ? '全部' : /食事[^。]*一部介助|一部介助[^。]*(摂取|食事)/.test(t) ? '一部' : '';
+  v.部分浴 = /手の部分浴|手浴/.test(t) ? '手' : /足の部分浴|足浴/.test(t) ? '足' : '';
+  v.清拭 = /全身清拭|全身を清拭/.test(t) ? '全身' : /清拭/.test(t) ? '部分' : '';
+  v.整容 = [['爪', /爪切り|爪を切/], ['耳', /耳掃除|耳垢/], ['髭', /髭剃り|ひげ剃り|髭を剃/], ['髪', /整髪|髪を整え|ブラッシング/], ['化粧', /化粧/]].filter(([, re]) => re.test(t)).map(([k]) => k);
+  v.預り = num(m(/預か?り(?:金)?\s*(\d[\d,]*)\s*円/)); v.購入 = num(m(/購入(?:金額)?\s*(\d[\d,]*)\s*円/, /(\d[\d,]*)\s*円(?:分)?(?:を|で)?購入/)); v.お釣 = num(m(/お?釣り?\s*(\d[\d,]*)\s*円/));
+  v.内訳 = m(/購入品[:：は]\s*([^。]+)/);
+  v.その他 = ['記録', ...(/環境を整え|整理整頓|清掃|掃除|動線|生活環境|環境整備/.test(t) ? ['環境整備'] : []), ...(/相談|傾聴|不安について話|話を伺/.test(t) ? ['相談援助'] : []), ...(/報告|情報/.test(t) ? ['情報収集・提供'] : [])];
+  Object.keys(v).forEach(k => { if (v[k] === '' || v[k] == null) delete v[k]; });
+  return v;
 }
 function vOf(r) { const a = vAuto(r), m = r.vin || {}; return { ...a, ...m }; }
 const SEIYO = { 爪: '爪切り', 耳: '耳掃除', 髭: '髭剃り', 髪: '整髪', 化粧: '化粧' };
@@ -1755,7 +1771,7 @@ const TEXT_KP = [
   [/着替|更衣/, '身体整容|更衣介助'], [/洗髪/, '入浴・清拭|洗髪'], [/服薬|薬を確認|飲み忘れ/, '服薬・医療|服薬介助・確認'], [/見守/, '服薬・医療|見守り'],
   [/移動時|移動は|付き添/, '移動|移動介助'], [/調理/, '調理|調理'], [/配膳/, '調理|配・下膳'], [/台所|キッチン/, '清掃|台所'], [/掃除|清掃/, '清掃|居室'],
   [/ゴミ/, '清掃|ゴミ出し'], [/洗濯/, '洗濯|洗濯'], [/畳ん|収納した|衣類を整理/, '洗濯|取入れ・収納'], [/買い物/, '買物等|日常品等の買物'], [/トイレ|排泄介助/, '排泄|トイレ介助'],
-  [/陰部/, '排泄|陰部清潔介助'], [/部分浴/, '入浴・清拭|部分浴'], [/清拭/, '入浴・清拭|清拭'], [/爪切り|耳掃除|髭剃り|整髪/, '身体整容|整容'], [/全介助にて摂取|一部介助を行い/, '食事|摂食介助'],
+  [/陰部/, '排泄|陰部清潔介助'], [/食べ残し|残され/, '食事|食べ残しあり'], [/おむつ交換|オムツ交換/, '排泄|おむつ交換'], [/パッド交換/, '排泄|パッド交換'], [/ポータブルトイレ/, '排泄|ポータブルトイレ介助'], [/体位変換/, '移動|体位変換'], [/移乗/, '移動|移乗介助'], [/通院/, '移動|通院介助'], [/点眼/, '服薬・医療|点眼'], [/塗布|軟膏/, '服薬・医療|薬の塗布'], [/シャワー浴/, '入浴・清拭|シャワー浴'], [/シーツ|カバー交換/, '衣類・寝具|シーツ・カバー交換'], [/ベッドメイク/, '衣類・寝具|ベッドメイク'], [/布団/, '衣類・寝具|布団干し'], [/薬の受け?取り/, '買物等|薬の受取り'], [/下拵え|下ごしらえ/, '調理|下拵え'], [/トイレ(の)?(清掃|掃除)/, '清掃|トイレ'], [/浴室(の)?(清掃|掃除)/, '清掃|浴室'], [/玄関/, '清掃|玄関'], [/干し|物干/, '洗濯|乾燥（物干し）'], [/アイロン/, '洗濯|アイロン'], [/水分補給|水分を/, '食事|水分補給'], [/姿勢/, '食事|姿勢の確保'], [/部分浴|手浴|足浴/, '入浴・清拭|部分浴'], [/清拭/, '入浴・清拭|清拭'], [/爪切り|耳掃除|髭剃り|整髪/, '身体整容|整容'], [/全介助にて摂取|一部介助を行い/, '食事|摂食介助'],
 ];
 function kpFromText(r) {
   const kp = kpOf(r), off = r.kpOff || [], t = r.text || '', shogai = kubunOf((state.name || '').trim()) !== '介護';
@@ -1765,18 +1781,22 @@ function kpFromText(r) {
   if (/と一緒に|共に/.test(t) && kp.some(k => k.startsWith('自立支援|')) === false && shogai && /一緒に行/.test(t)) add('自立支援|掃除');
 }
 function vSummary(r) {
-  const v = vOf(r), m = r.vin || {}, x = [];
-  x.push(`顔色:${v.顔色}`, `発汗:${v.発汗}`);
-  if (m.体温) x.push(`体温:${m.体温}℃`); if (m.血圧上) x.push(`血圧:${m.血圧上}/${m.血圧下 || ''}`);
-  if (m.排尿回数 || m.排尿量) x.push(`排尿:${m.排尿回数 || ''}回${m.排尿量 ? m.排尿量 + 'cc' : ''}`);
-  if (m.排便回数 || m.排便状態) x.push(`排便:${m.排便回数 || ''}回${m.排便状態 ? ' ' + m.排便状態 : ''}`);
-  if (m.水分) x.push(`水分:${m.水分}cc`); if (m.食事量) x.push(`食事量:${m.食事量}`);
-  if (m.購入) x.push(`購入:${m.購入}円`);
+  const v = vOf(r), x = [`顔色:${v.顔色}`, `発汗:${v.発汗}`];
+  if (v.体温) x.push(`体温:${v.体温}℃`); if (v.血圧上) x.push(`血圧:${v.血圧上}/${v.血圧下 || ''}`);
+  if (v.排尿回数 || v.排尿量) x.push(`排尿:${v.排尿回数 ? v.排尿回数 + '回' : ''}${v.排尿量 ? v.排尿量 + 'cc' : ''}`);
+  if (v.排便回数 || v.排便状態) x.push(`排便:${v.排便回数 ? v.排便回数 + '回' : ''}${v.排便状態 ? ' ' + v.排便状態 : ''}`);
+  if (v.摂食) x.push(`摂食介助:${v.摂食}`); if (v.食事量) x.push(`食事量:${v.食事量}`); if (v.水分) x.push(`水分:${v.水分}cc`);
+  if (v.部分浴) x.push(`部分浴:${v.部分浴}`); if (v.清拭) x.push(`清拭:${v.清拭}`); if ((v.整容 || []).length) x.push(`整容:${v.整容.join('・')}`);
+  if (v.預り) x.push(`預り:${v.預り}円`); if (v.購入) x.push(`購入:${v.購入}円`); if (v.お釣) x.push(`お釣:${v.お釣}円`);
   x.push(`その他:${(v.その他 || []).join('・') || 'なし'}`);
   if (v.変更 === '有') x.push('予定変更:有'); if ((v.加算 || []).length) x.push(`加算:${v.加算.join('・')}`);
   return x.join('／');
 }
 let vPopRow = -1;
+function liveV(i, ta) {  // 入力中にまとめ・記録欄を更新（文章欄はそのまま）
+  const sum = ta.closest('tr')?.querySelector('.vsum'); if (sum) sum.textContent = vSummary(recRows[i]);
+  if (vPopRow === i) renderVPop(i);
+}
 function setVin(i, k, val) {
   const r = recRows[i]; r.vin = r.vin || {};
   if (val === '' || val == null || (Array.isArray(val) && !val.length)) delete r.vin[k]; else r.vin[k] = val;
@@ -1797,7 +1817,7 @@ function renderVPop(i) {
   const v = vOf(r), m = r.vin || {}, auto = vAuto(r);
   const radio = (k, opts) => opts.map(o => `<span class="chip ${v[k] === o ? 'on' : ''} ${v[k] === o && m[k] == null ? 'auto' : ''}" onclick="setVin(${i},'${k}',${v[k] === o && m[k] != null ? "''" : `'${o}'`})">${o}</span>`).join('');
   const multi = (k, opts) => opts.map(o => `<span class="chip ${(v[k] || []).includes(o) ? 'on' : ''} ${m[k] == null && (auto[k] || []).includes(o) ? 'auto' : ''}" onclick="toggleVArr(${i},'${k}','${o}')">${o}</span>`).join('');
-  const num = (k, w, unit, type = 'number') => `<input type="${type}" ${w ? `style="width:${w}px"` : ''} value="${esc(m[k] || '')}" onchange="setVin(${i},'${k}',this.value.trim())">${unit || ''}`;
+  const num = (k, w, unit, type = 'number') => `<input type="${type}" ${w ? `style="width:${w}px"` : ''} ${m[k] == null && auto[k] ? 'class="auto" title="文章から自動で入った値"' : ''} value="${esc(v[k] || '')}" onchange="setVin(${i},'${k}',this.value.trim())">${unit || ''}`;
   pop.innerHTML = `<div class="head"><b>訪問記録の欄（入れると文章に自動で反映）</b><button class="small" onclick="document.getElementById('vPop').style.display='none';vPopRow=-1">閉じる</button></div>
   <div style="font-size:11px;color:var(--muted)">点線＝文章から自動で入った値。押すと自分で選び直せます。</div>
   <div class="cat">予定の変更・特定加算</div><div class="row chips">${radio('変更', ['有', '無'])}　${multi('加算', ['初回', '緊急'])}</div>
@@ -1811,7 +1831,7 @@ function renderVPop(i) {
   <div class="cat">入浴・清拭／身体整容</div><div class="row chips">部分浴 ${radio('部分浴', ['手', '足'])}　清拭 ${radio('清拭', ['全身', '部分'])}</div>
   <div class="row chips" style="margin-top:4px">整容 ${multi('整容', ['爪', '耳', '髭', '髪', '化粧'])}</div>
   <div class="cat">買物等</div><div class="row">預り ${num('預り', 64, '円')} 購入 ${num('購入', 64, '円')} お釣 ${num('お釣', 64, '円')}</div>
-  <div class="row" style="margin-top:4px">内訳 <input type="text" class="wide" value="${esc(m.内訳 || '')}" onchange="setVin(${i},'内訳',this.value.trim())"></div>`;
+  <div class="row" style="margin-top:4px">内訳 <input type="text" class="wide ${m.内訳 == null && auto.内訳 ? 'auto' : ''}" value="${esc(v.内訳 || '')}" onchange="setVin(${i},'内訳',this.value.trim())"></div>`;
 }
 function openVPop(i, btn) {
   const pop = document.getElementById('vPop');
@@ -2261,7 +2281,7 @@ function renderRecordView() {
       ${r.flag ? `<span class="flag">${esc(r.flag)}</span>` : ''}</td>
     <td class="staff"><select onchange="recRows[${i}].staff=this.value;recRows[${i}].staffEdited=true">${staffOptions(r.staff)}</select></td>
     <td class="kind">${r.kind}<br><small style="color:var(--muted)">${esc(r.e.type)}</small>${recItemChips(r, i)}</td>
-    <td class="txt">${ngIdx.has(i) ? ngHits(r.text).map(w => `<span class="ng-badge">NG「${esc(w)}」</span>`).join('') : ''}${dupIdx.has(i) ? `<span class="dup-badge">⚠ 同じ文章（${dupIdx.get(i)}）</span>` : ''}<textarea oninput="recRows[${i}].text=this.value" onchange="kpFromText(recRows[${i}]);renderRecordView()">${esc(r.text)}</textarea></td>
+    <td class="txt">${ngIdx.has(i) ? ngHits(r.text).map(w => `<span class="ng-badge">NG「${esc(w)}」</span>`).join('') : ''}${dupIdx.has(i) ? `<span class="dup-badge">⚠ 同じ文章（${dupIdx.get(i)}）</span>` : ''}<textarea oninput="recRows[${i}].text=this.value;liveV(${i},this)" onchange="kpFromText(recRows[${i}]);renderRecordView();markRecDirty()">${esc(r.text)}</textarea></td>
     <td class="act"><button class="small" title="別の言い回し" onclick="recRows[${i}].text=uniqueText(recRows[${i}],recRows.filter((_,j)=>j!==${i}));renderRecordView()">↻</button>
       <button class="small" title="文章をコピー" onclick="copyText(recRows[${i}].text,this)">📋</button><br>
       <button class="small" title="感情・状態を選んで文に追加" style="margin-top:4px" onclick="openStatePop(${i},this)">😊様子</button></td>
