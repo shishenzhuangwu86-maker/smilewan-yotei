@@ -170,6 +170,11 @@
   #vPop .head { display: flex; justify-content: space-between; align-items: center; font-size: 12px; margin-bottom: 4px; }
   #vPop .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; }
   #vPop input[type=number], #vPop input[type=text] { width: 64px; padding: 3px 5px; font-size: 12px; }
+  #menuOut table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+  #menuOut th, #menuOut td { border: 1px solid var(--line); padding: 3px 5px; text-align: left; vertical-align: top; }
+  #menuOut th { background: var(--soft, rgba(127,127,127,.08)); white-space: nowrap; }
+  #menuOut .shop { font-size: 12px; margin-top: 6px; line-height: 1.7; }
+  #menuOut .shop b { display: inline-block; min-width: 7.5em; }
   #vPop .row > *, #vPop .row .chip { flex: none !important; }
   #vPop input.wide { flex: 1 1 auto !important; width: auto; }
   #vPop .chip.auto, #vPop input.auto { border-style: dashed; }
@@ -274,6 +279,12 @@
       <div class="hint" id="assessSummary" style="margin:0 0 4px">まだ取り込んでいません</div>
       <button class="small" onclick="document.getElementById('assessFile').click()">📋 アセスメント・計画書取込（PDF・複数可）</button>
       <input type="file" id="assessFile" accept="application/pdf" multiple style="display:none" onchange="importAssessment(this)">
+      <label>🍱 献立・買い物リスト</label>
+      <label style="font-weight:normal">食べられない物・嫌いな物・アレルギー（「、」区切り。献立と買い物リストから外します）</label>
+      <input type="text" id="ciFood" placeholder="例：えび、そば、牛乳、生野菜" oninput="clientDirty()">
+      <div class="hint" id="menuRules" style="margin:4px 0"></div>
+      <div class="row"><button class="small" onclick="makeMenu()">🍱 献立と買い物リストを作成</button><button class="small" onclick="copyMenu(this)">📋 コピー</button></div>
+      <div id="menuOut"></div>
       <div class="row" style="margin-top:6px"><button class="small primary fixed" onclick="saveClientInfo()">💾 利用者情報を保存</button><span class="hint" style="margin:0">手で直した内容は、CSVを取り込み直しても消えません。</span></div>
     </details>
 
@@ -427,6 +438,7 @@
           <ul>
             <li><b>実施項目</b>：カイポケでチェックする項目が青く選ばれている。押すと外れ、「＋項目」でカイポケと同じ並びの一覧から足せる</li>
             <li><b>📝記録欄</b>：カイポケの欄（顔色・発汗・体温・血圧・排尿／排便の回数・量・食事量・水分cc・部分浴・清拭・整容・買物の金額と内訳・その他・予定の変更・加算）。入れた数字は文章に自動で書き足され、消すと文章からも消える。文章に書いた体温・血圧・排尿／排便・食事量・水分cc・清拭・整容・金額なども自動で欄に入る（点線。文章を打っている途中でも反映）。押せば選び直せる</li>
+            <li><b>🍱 献立・買い物リスト</b>（利用者情報の中）：予定表の調理の曜日・食事ごとに献立を作り、材料をまとめた買い物リストも作る。アセスメントの病名（高血圧→減塩、糖尿病→糖質控えめ）・義歯（やわらかい料理）・調理の力（障害→簡単な料理）と、「食べられない物」欄・NGの言葉を外して作る。作った献立は記録の「調理」の文に入る</li>
             <li><b>記録の文章</b>：直接書き換えられる。「↻」で別の言い回し</li>
             <li><b>様子</b>：「😊様子」で一文を足す（★はアセスメントからのおすすめ）</li>
             <li>出力しない行は左のチェックを外す</li>
@@ -886,6 +898,7 @@ function renderClientBox(force) {
   const i = name ? clientInfoOf(name) : { address: '', phone: '', emergency: '', memo: '' };
   document.getElementById('ciAddress').value = i.address; document.getElementById('ciPhone').value = i.phone;
   document.getElementById('ciEmergency').value = i.emergency; document.getElementById('ciMemo').value = i.memo;
+  document.getElementById('ciFood').value = name ? (getColl('clients')[docId(name)]?.food || '') : ''; renderMenu();
   const st = document.getElementById('clientState');
   st.textContent = !name ? '' : i.manual ? '保存済み' : (i.address || i.phone) ? 'CSVから' : '未入力'; st.className = 'sync ' + (i.manual ? 'ok' : 'local');
 }
@@ -893,10 +906,124 @@ async function saveClientInfo() {
   const name = (state.name || '').trim();
   if (!name) { alert('先に利用者名を入力（または選択）してください'); return; }
   const prevNg = clientNg(name), prevDoc = getColl('clients')[docId(name)] || {};
-  const data = { ...prevDoc, name, ng: prevNg, address: document.getElementById('ciAddress').value.trim(), phone: document.getElementById('ciPhone').value.trim(), emergency: document.getElementById('ciEmergency').value.trim(), memo: document.getElementById('ciMemo').value.trim(), updatedAt: new Date().toISOString() };
+  const data = { ...prevDoc, name, ng: prevNg, address: document.getElementById('ciAddress').value.trim(), phone: document.getElementById('ciPhone').value.trim(), emergency: document.getElementById('ciEmergency').value.trim(), memo: document.getElementById('ciMemo').value.trim(), food: document.getElementById('ciFood').value.trim(), updatedAt: new Date().toISOString() };
   const ok = await putDoc('clients', docId(name), data);
   clientEdited = false; renderClientBox(true);
   if (ok) alert(`「${name}」の利用者情報を保存しました${DB ? '（共有）' : ''}`);
+}
+// ===== 献立・買い物リスト（予定表の調理の日 × アセスメントの配慮 × 食べられない物・NG を避けて自動作成） =====
+//   t: 塩=塩分が多い 硬=硬い・噛みにくい 揚=揚げ物 糖=糖質が多い 脂=脂が多い 簡=簡単（一緒に作りやすい）
+const DISH = {
+  主菜: [
+    ['肉じゃが', ['豚肉', 'じゃがいも', '玉ねぎ', 'にんじん'], ''], ['鮭の塩焼き', ['生鮭'], '塩'], ['さばの味噌煮', ['さば'], ''], ['鶏の照り焼き', ['鶏もも肉'], ''],
+    ['豚の生姜焼き', ['豚ロース', '玉ねぎ', 'しょうが'], '簡'], ['ハンバーグ', ['合いびき肉', '玉ねぎ', 'パン粉', '卵'], '脂'], ['麻婆豆腐', ['豆腐', '豚ひき肉', '長ねぎ'], ''],
+    ['鶏の唐揚げ', ['鶏もも肉', '片栗粉'], '揚脂'], ['豆腐ハンバーグ', ['豆腐', '鶏ひき肉', '玉ねぎ'], ''], ['白身魚のホイル焼き', ['たら', '玉ねぎ', 'しめじ'], '簡'],
+    ['親子煮', ['鶏もも肉', '卵', '玉ねぎ'], '簡'], ['野菜炒め', ['豚肉', 'キャベツ', 'にんじん', 'もやし'], '簡'], ['ぶり大根', ['ぶり', '大根'], ''],
+    ['鶏むね肉のトマト煮', ['鶏むね肉', 'トマト缶', '玉ねぎ'], ''], ['回鍋肉', ['豚肉', 'キャベツ', 'ピーマン'], ''], ['かれいの煮付け', ['かれい'], ''],
+    ['ロールキャベツ', ['キャベツ', '合いびき肉', '玉ねぎ'], ''], ['豚肉と白菜の重ね煮', ['豚肉', '白菜'], '簡'], ['とんかつ', ['豚ロース', 'パン粉', '卵'], '揚脂'],
+    ['えびチリ', ['えび', '長ねぎ'], ''], ['すき焼き風煮', ['牛肉', '豆腐', '長ねぎ', '白菜'], '糖'], ['鶏つくね', ['鶏ひき肉', '長ねぎ'], ''],
+  ],
+  朝: [
+    ['卵焼き', ['卵'], '簡'], ['納豆', ['納豆'], '簡'], ['焼き鮭', ['生鮭'], '塩'], ['ハムエッグ', ['ハム', '卵'], '簡塩'], ['温泉卵', ['卵'], '簡'],
+    ['冷奴', ['豆腐'], '簡'], ['スクランブルエッグ', ['卵', '牛乳'], '簡'], ['さばの塩焼き', ['さば'], '塩'],
+  ],
+  副菜: [
+    ['ほうれん草のおひたし', ['ほうれん草'], '簡'], ['ひじきの煮物', ['ひじき', 'にんじん', '油揚げ'], ''], ['かぼちゃの煮物', ['かぼちゃ'], '糖'], ['きんぴらごぼう', ['ごぼう', 'にんじん'], '硬'],
+    ['ポテトサラダ', ['じゃがいも', 'きゅうり', 'マヨネーズ'], '脂'], ['小松菜と油揚げの煮びたし', ['小松菜', '油揚げ'], '簡'], ['切り干し大根の煮物', ['切り干し大根', 'にんじん'], ''],
+    ['トマトサラダ', ['トマト'], '簡'], ['なすの煮びたし', ['なす'], ''], ['白菜のおかか和え', ['白菜', 'かつお節'], '簡'], ['ブロッコリーのごま和え', ['ブロッコリー', 'すりごま'], '簡'],
+    ['大根とツナのサラダ', ['大根', 'ツナ缶'], '簡'], ['もやしのナムル', ['もやし', 'ごま油'], '簡硬'], ['きゅうりの浅漬け', ['きゅうり'], '塩簡'], ['冬瓜のくず煮', ['冬瓜'], ''],
+  ],
+  汁物: [
+    ['豆腐とわかめの味噌汁', ['豆腐', 'わかめ', '味噌'], '簡'], ['玉ねぎとじゃがいもの味噌汁', ['玉ねぎ', 'じゃがいも', '味噌'], ''], ['大根と油揚げの味噌汁', ['大根', '油揚げ', '味噌'], ''],
+    ['かき玉汁', ['卵', '長ねぎ'], '簡'], ['けんちん汁', ['大根', 'にんじん', 'ごぼう', '豆腐'], ''], ['野菜スープ', ['キャベツ', '玉ねぎ', 'にんじん'], '簡'],
+    ['なめこ汁', ['なめこ', '味噌'], '簡'], ['豚汁', ['豚肉', '大根', 'にんじん', 'ごぼう', '味噌'], ''],
+  ],
+};
+const SHOP_CAT = [['肉・魚', /肉|豚|牛|鶏|鮭|さば|たら|ぶり|かれい|えび|ハム|ツナ/], ['卵・乳・豆腐', /卵|牛乳|豆腐|納豆|油揚げ/], ['野菜・きのこ', /玉ねぎ|にんじん|じゃがいも|キャベツ|もやし|ピーマン|大根|白菜|長ねぎ|ほうれん草|小松菜|かぼちゃ|ごぼう|きゅうり|トマト|なす|ブロッコリー|冬瓜|しめじ|なめこ|しょうが/], ['乾物・その他', /./]];
+// 予定表から「調理がある曜日×食事」を拾う
+function menuSlots() {
+  const out = [];
+  [1, 2, 3, 4, 5, 6, 0].forEach(dow => (dayEntries(state.days[dow]) || []).forEach(e => {
+    const t = (e.type || '') + ' ' + (e.detail || '');
+    if (!/調理|食事|朝食|昼食|夕食|配膳|提供/.test(t) || /共に行う片付け/.test(t)) return;
+    const h = parseInt(e.start || '12', 10);
+    const meals = t.match(/朝食|昼食|夕食/g) || [h < 11 ? '朝食' : h < 16 ? '昼食' : '夕食'];
+    [...new Set(meals)].forEach(m => { if (!out.some(x => x.dow === dow && x.meal === m)) out.push({ dow, meal: m, together: /共に|一緒/.test(t) }); });
+  }));
+  return out;
+}
+// アセスメント・メモ・食べられない物・NG から献立の決まりを作る
+function menuRules(name) {
+  const c = getColl('clients')[docId(name)] || {}, a = c.assessment || {}, all = JSON.stringify(a) + ' ' + (c.memo || '');
+  const food = (document.getElementById('ciFood')?.value ?? c.food ?? '');
+  const ngFood = [...new Set([...food.split(/[、,，・\s／/]+/), ...[...(c.memo || '').matchAll(/(?:アレルギー|嫌い|食べられない|禁止)[：:は]?\s*([^。\n]+)/g)].flatMap(m => m[1].split(/[、,，・\s]+/))].map(x => x.trim()).filter(x => x && x.length < 12))];
+  const ng = [...new Set([...clientNg(name), ...ngFood])];
+  const avoid = new Set(), notes = [];
+  const dz = (a.diseases || []).join(' ') + ' ' + all;
+  if (/高血圧|腎|減塩|心不全/.test(dz)) { avoid.add('塩'); notes.push('高血圧など→減塩（塩分の多い料理を外し、薄味に）'); }
+  if (/糖尿|血糖/.test(dz)) { avoid.add('糖'); avoid.add('揚'); notes.push('糖尿病→糖質・揚げ物を控える'); }
+  if (/脂質|コレステロール|肥満/.test(dz)) { avoid.add('脂'); avoid.add('揚'); notes.push('脂質→脂の多い料理を控える'); }
+  if (a.dentures || /義歯|入れ歯|嚥下|むせ|刻み|とろみ/.test(all)) { avoid.add('硬'); avoid.add('揚'); notes.push('義歯・嚥下→やわらかく食べやすい料理'); }
+  const easy = /簡単な調理|温め|調理の際は支援|長時間台所/.test(all) || kubunOf(name) === '障害';
+  if (easy) notes.push('障害・簡単な調理→本人と一緒に作りやすい簡単な料理を多めに');
+  if (/食欲低下|食事量を摂取することが難しい|適量を食事/.test(all)) notes.push('食事量→少なめでも食べやすい料理に');
+  if (ng.length) notes.push('外す食材・言葉：' + ng.join('、'));
+  return { avoid, ng, notes, easy };
+}
+function dishOk(d, R) {
+  const [nm, ing, tg] = d, text = nm + ' ' + ing.join(' ');
+  if ([...R.avoid].some(k => tg.includes(k))) return false;
+  if (R.ng.some(w => w && text.includes(w))) return false;
+  if (ngHits(text).length) return false;
+  return true;
+}
+function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function makeMenu() {
+  const name = (state.name || '').trim(); if (!name) { alert('先に利用者を選んでください'); return; }
+  let slots = menuSlots();
+  if (!slots.length) { if (!confirm('予定表に調理（朝食・昼食・夕食）の予定が見つかりません。\n1週間分の夕食で作りますか？')) return; slots = [1, 2, 3, 4, 5, 6, 0].map(dow => ({ dow, meal: '夕食' })); }
+  const R = menuRules(name);
+  const pool = k => { let p = DISH[k].filter(d => dishOk(d, R)); if (R.easy) p = [...p.filter(d => d[2].includes('簡')), ...p]; return shuffle(p); };
+  const used = { 主菜: [], 朝: [], 副菜: [], 汁物: [] };
+  const take = (k, ban) => { const p = pool(k); const d = p.find(x => !used[k].includes(x[0]) && !(ban || []).some(b => x[1].includes(b))) || p.find(x => !used[k].includes(x[0])) || p[0]; if (d) { used[k].push(d[0]); if (used[k].length >= p.length) used[k] = []; } return d; };
+  const plan0 = [];
+  const plan = slots.map(sl => {
+    const main = take(sl.meal === '朝食' ? '朝' : '主菜'); const mainIng = main ? main[1] : [];
+    const side = take('副菜', mainIng);
+    const lowSalt = R.avoid.has('塩'), soupToday = lowSalt && plan0.some(x => x.dow === sl.dow && x.soup);
+    const soup = lowSalt && (sl.meal === '朝食' || soupToday) ? null : take('汁物', lowSalt ? [...mainIng, '味噌'] : mainIng);
+    plan0.push({ dow: sl.dow, soup: !!soup });
+    return { ...sl, dishes: ['ご飯', main?.[0], sl.meal === '朝食' ? null : side?.[0], soup?.[0]].filter(Boolean), ing: [main, side && sl.meal !== '朝食' ? side : null, soup].filter(Boolean).flatMap(d => d[1]) };
+  });
+  const cnt = {}; plan.forEach(p => p.ing.forEach(x => { if (!R.ng.some(w => x.includes(w))) cnt[x] = (cnt[x] || 0) + 1; }));
+  cnt['米（残りを確認）'] = 1;
+  const list = {}; SHOP_CAT.forEach(([c]) => { list[c] = []; });
+  Object.entries(cnt).forEach(([x, n]) => { const c = SHOP_CAT.find(([, re]) => re.test(x))[0]; list[c].push(n > 1 ? `${x}（${n}回分）` : x); });
+  Object.keys(list).forEach(c => { if (!list[c].length) delete list[c]; });
+  if (R.avoid.has('塩')) R.notes.push('汁物は1日1回まで（減塩）');
+  const doc = getColl('clients')[docId(name)] || { name };
+  const menu = { created: new Date().toISOString(), plan: plan.map(({ ing, ...p }) => p), list, notes: R.notes };
+  putDoc('clients', docId(name), { ...doc, name, food: document.getElementById('ciFood').value.trim(), menu, updatedAt: new Date().toISOString() });
+  renderMenu();
+}
+function renderMenu() {
+  const out = document.getElementById('menuOut'), rules = document.getElementById('menuRules'); if (!out) return;
+  const name = (state.name || '').trim(), m = name && getColl('clients')[docId(name)]?.menu;
+  rules.textContent = name ? '配慮：' + (menuRules(name).notes.join('／') || '特になし（アセスメントに食事の制限なし）') : '';
+  if (!m) { out.innerHTML = ''; return; }
+  out.innerHTML = `<table><tr><th>曜日</th><th>食事</th><th>献立</th></tr>${m.plan.map(p => `<tr><td>${DAYS[p.dow]}</td><td>${p.meal}</td><td>${esc(p.dishes.join('・'))}</td></tr>`).join('')}</table>
+    <div class="shop"><b>🛒 買い物リスト</b><br>${Object.entries(m.list).map(([c, xs]) => `<b>${c}</b>${esc(xs.join('、'))}`).join('<br>')}</div>
+    <div class="hint">作成日 ${m.created.slice(0, 10)}　※ 記録の「調理」の文にこの献立が入ります。冷蔵庫の残りを見て調整してください。</div>`;
+}
+function menuText(name) {
+  const m = getColl('clients')[docId(name)]?.menu; if (!m) return '';
+  return `【${name} 様　献立】\n` + m.plan.map(p => `${DAYS[p.dow]}　${p.meal}：${p.dishes.join('・')}`).join('\n') + '\n\n【買い物リスト】\n' + Object.entries(m.list).map(([c, xs]) => `${c}：${xs.join('、')}`).join('\n');
+}
+function copyMenu(btn) { const t = menuText((state.name || '').trim()); if (!t) { alert('先に「献立と買い物リストを作成」を押してください'); return; } copyText(t, btn); }
+// 記録の「調理」の文に、その曜日・食事の献立を入れる
+function menuFor(row, meal) {
+  const m = getColl('clients')[docId((state.name || '').trim())]?.menu; if (!m) return '';
+  const p = m.plan.find(x => x.dow === row.date.getDay() && x.meal === meal); return p ? p.dishes.filter(d => d !== 'ご飯').join('・') : '';
 }
 // 訪問記録: 利用者×月 ごとに1件（同じ日時の行は上書き）
 const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -2038,7 +2165,7 @@ function genShogai(row) {
   } else if (row.kind === '家事援助') {
     cat = '家事';
     if (ctx.cont) s.push(ctx.link('本人', true));
-    if (hasC('調理') || /朝食|昼食|夕食|調理|食事/.test(row.e.detail || '')) s.push(pickF(SG.meal(meal)), pickF(SG.mealMore), pickF(SG.mealAfter));
+    if (hasC('調理') || /朝食|昼食|夕食|調理|食事/.test(row.e.detail || '')) { const mn = menuFor(row, meal); s.push(mn ? `${meal}は献立に沿って${mn}を調理し、配膳した。` : pickF(SG.meal(meal)), pickF(SG.mealMore), pickF(SG.mealAfter)); }
     if (hasC('清掃')) s.push(pickF(SG.clean), ...(s.length < 2 ? [pickF(SG.cleanMore)] : []));
     if (hasC('洗濯')) s.push(pickF(SG.laundry));
     if (hasC('買物等')) s.push(pickF(SG.shopping));
@@ -2106,7 +2233,7 @@ function genTokki(row) {
                                   : pickF(['洗濯物は一緒に畳み、収納場所を確認しながら整理した。', '洗濯機の操作を声掛けで確認しながら、ご自身で行っていただいた。']));
     if (hasC('買物等')) jobs.push(K ? pickF(['必要な食品や日用品を確認して買い物代行を行い、購入品を所定の場所へ収納した。', '買い物代行では必要な食品・日用品を購入し、帰宅後に収納まで行った。'])
                                     : pickF(['買う物を利用者様と一緒に考えてメモにまとめ、買い物代行後は購入品の整理を一緒に行った。', '必要な物を一緒に確認し、購入後はお釣りとレシートをご自身で確認していただいた。']));
-    if (hasC('調理')) jobs.push(K ? `${meal}の準備を行い、配膳・片付けまで行った。` : `${meal}の調理は手順を声掛けしながら一緒に行った。`);
+    if (hasC('調理')) { const mn = menuFor(row, meal); jobs.push(K ? `${meal}${mn ? `（${mn}）` : ''}の準備を行い、配膳・片付けまで行った。` : `${meal}${mn ? `（${mn}）` : ''}の調理は手順を声掛けしながら一緒に行った。`); }
     if (!jobs.length) jobs.push(K ? 'ヘルパーが必要な家事援助を行い、生活環境を整えた。' : '家事の手順を一緒に確認し、利用者様ができる部分はご自身で行っていただいた。');
     s.push(...jobs.slice(0, 3));
   } else {
@@ -2114,7 +2241,7 @@ function genTokki(row) {
     const acts = [];
     // 夜の就寝介助がある日は「夕食 → 更衣・就寝準備」の順に並べる
     const mealFirst = has('起床・就寝|就寝介助') && K && (/生活|家事/.test(row.e.type || '') || ['調理', '清掃', '洗濯', '買物等'].some(hasC)) && (/朝食|昼食|夕食|提供|準備/.test(row.e.detail || '') || hasC('調理'));
-    if (mealFirst) s.push(`${meal}の準備・配膳を行い、食後に就寝の支度へ移った。`);
+    if (mealFirst) { const mn = menuFor(row, meal); s.push(`${meal}${mn ? `（${mn}）` : ''}の準備・配膳を行い、食後に就寝の支度へ移った。`); }
     if (has('起床・就寝|起床介助') && !ctx.hadWake && tod === '朝') acts.push('起床');
     if (hasC('排泄')) acts.push(K ? 'トイレへの移動・排泄介助' : 'トイレへの移動');
     if (has('身体整容|更衣介助') || has('起床・就寝|就寝介助') || /更衣|着替|整容|等/.test(row.e.detail || '')) acts.push('更衣');
@@ -2136,7 +2263,7 @@ function genTokki(row) {
       s.push(pickF([`${what}は利用者様と一緒に行い、できるところはご自身で取り組んでいただいた。`, `${what}の手順を声掛けで確認しながら、利用者様と一緒に行った。`]));
     }
     if (!mealFirst && (/生活|家事/.test(row.e.type || '') || ['調理', '清掃', '洗濯', '買物等'].some(hasC))) {
-      if (/朝食|昼食|夕食|提供|準備/.test(row.e.detail || '') || hasC('調理')) s.push(K ? `${meal}の準備・配膳を行った。` : `${meal}の準備は手順を声掛けしながら一緒に行った。`);
+      if (/朝食|昼食|夕食|提供|準備/.test(row.e.detail || '') || hasC('調理')) { const mn = menuFor(row, meal); s.push(K ? `${meal}${mn ? `（${mn}）` : ''}の準備・配膳を行った。` : `${meal}${mn ? `（${mn}）` : ''}の準備は手順を声掛けしながら一緒に行った。`); }
       else s.push(K ? pickF(['生活に必要な準備を行い、室内を整えた。', '過ごしやすいよう生活環境を整えた。']) : '身の回りの整理は、利用者様と一緒に行った。');
     }
   }
