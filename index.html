@@ -44,7 +44,7 @@
     .editor { max-height: none; border-right: none; border-bottom: 1px solid var(--line); }
     .preview-wrap { align-items: stretch; }
     .day-tabs button { font-size: 15px; padding: 6px 0; }
-    #statePop, #kpPop { width: calc(100vw - 32px); left: 16px !important; }
+    #statePop, #kpPop, #vPop { width: calc(100vw - 32px); left: 16px !important; }
   }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
   h1 { font-size: 16px; margin: 0 0 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
@@ -165,6 +165,15 @@
   .ng-alert { background: var(--ng-alert-bg); color: var(--ng-alert-text); border: 1px solid var(--ng-alert-line); border-radius: 6px; padding: 6px 10px; margin-bottom: 8px; font-size: 13px; }
   .dup-alert { background: var(--dup-alert-bg); color: var(--dup-alert-text); border: 1px solid var(--dup-alert-line); border-radius: 6px; padding: 6px 10px; margin-bottom: 8px; font-size: 13px; }
   #kpPop { position: absolute; z-index: 50; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,.18); padding: 10px 12px; width: 470px; max-height: 70vh; overflow: auto; display: none; }
+  #vPop { position: absolute; z-index: 50; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,.18); padding: 10px 12px; width: 470px; max-height: 75vh; overflow: auto; display: none; }
+  #vPop .cat { font-size: 11px; color: var(--muted); margin: 8px 0 3px; }
+  #vPop .head { display: flex; justify-content: space-between; align-items: center; font-size: 12px; margin-bottom: 4px; }
+  #vPop .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; }
+  #vPop input[type=number], #vPop input[type=text] { width: 64px; padding: 3px 5px; font-size: 12px; }
+  #vPop .row > *, #vPop .row .chip { flex: none !important; }
+  #vPop input.wide { flex: 1 1 auto !important; width: auto; }
+  #vPop .chip.auto { border-style: dashed; }
+  .vsum { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
   #kpPop .cat { font-size: 11px; color: var(--muted); margin: 8px 0 3px; }
   #kpPop .head { display: flex; justify-content: space-between; align-items: center; font-size: 12px; margin-bottom: 4px; }
   #statePop { position: absolute; z-index: 50; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,.18); padding: 10px 12px; width: 460px; max-height: 70vh; overflow: auto; display: none; }
@@ -417,6 +426,7 @@
         <li>行ごとに確認・修正する
           <ul>
             <li><b>実施項目</b>：カイポケでチェックする項目が青く選ばれている。押すと外れ、「＋項目」でカイポケと同じ並びの一覧から足せる</li>
+            <li><b>📝記録欄</b>：カイポケの欄（顔色・発汗・体温・血圧・排尿／排便の回数・量・食事量・水分cc・部分浴・清拭・整容・買物の金額と内訳・その他・予定の変更・加算）。入れた数字は文章に自動で書き足され、消すと文章からも消える。顔色・発汗・その他・実施項目は文章から自動で入る（点線）。押せば選び直せる</li>
             <li><b>記録の文章</b>：直接書き換えられる。「↻」で別の言い回し</li>
             <li><b>様子</b>：「😊様子」で一文を足す（★はアセスメントからのおすすめ）</li>
             <li>出力しない行は左のチェックを外す</li>
@@ -455,6 +465,7 @@
 
     <div id="statePop"></div>
     <div id="kpPop"></div>
+    <div id="vPop"></div>
   </div>
 </div>
 
@@ -901,7 +912,7 @@ async function saveRecords(opt = {}) {
   for (const [month, rs] of Object.entries(byMonth)) {
     const id = docId(name) + '_' + month, prev = getColl('records')[id];
     const map = new Map((prev?.rows || []).map(x => [x.date + ' ' + x.start, x]));
-    rs.forEach(r => { const x = { date: ymd(r.date), start: r.e.start || '', end: r.e.end || '', type: r.e.type || '', detail: r.e.detail || '', staff: r.staff || '', kind: r.kind, text: r.text || '', flag: r.flag || '', kp: kpOf(r) }; map.set(x.date + ' ' + x.start, x); n++; });
+    rs.forEach(r => { const x = { date: ymd(r.date), start: r.e.start || '', end: r.e.end || '', type: r.e.type || '', detail: r.e.detail || '', staff: r.staff || '', kind: r.kind, text: r.text || '', flag: r.flag || '', kp: kpOf(r), vin: r.vin || {}, kpOff: r.kpOff || [], vinText: r.vinText || null, v: vOf(r) }; map.set(x.date + ' ' + x.start, x); n++; });
     const list = [...map.values()].sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start));
     ok = (await putDoc('records', id, { name, month, rows: list, updatedAt: new Date().toISOString() })) && ok;
   }
@@ -920,7 +931,7 @@ function openSavedRecords() {
   const d = month && getColl('records')[docId(name) + '_' + month];
   if (!d) { alert('開く記録を選んでください'); return; }
   if (recRows.length && !confirm('今の表の内容を、保存した記録に入れ替えますか？')) return;
-  recRows = d.rows.map(x => ({ date: new Date(x.date + 'T00:00:00'), e: { ...emptyEntry(), type: x.type, start: x.start, end: x.end, detail: x.detail }, kind: x.kind, staff: x.staff, staffEdited: true, on: true, flag: x.flag || '', text: x.text, kp: x.kp || autoKP({ type: x.type, detail: x.detail }) }))
+  recRows = d.rows.map(x => ({ date: new Date(x.date + 'T00:00:00'), e: { ...emptyEntry(), type: x.type, start: x.start, end: x.end, detail: x.detail }, kind: x.kind, staff: x.staff, staffEdited: true, on: true, flag: x.flag || '', text: x.text, vin: x.vin || {}, kpOff: x.kpOff || [], vinText: x.vinText || null, kp: x.kp || autoKP({ type: x.type, detail: x.detail }) }))
     .sort((a, b) => (b.date - a.date) || ((b.e.start || '') > (a.e.start || '') ? 1 : -1));
   const [y, m] = month.split('-').map(Number);
   document.getElementById('recFrom').value = `${month}-01`; document.getElementById('recTo').value = `${month}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
@@ -1665,7 +1676,7 @@ function rowE(row) { const kp = kpOf(row); return { ...row.e, detail: kp.map(k =
 function itemUnmapped(v) { if (/^[（(].*[）)]$/.test(v) && /生活|身体|\d/.test(v)) return false; const t = tagsFor({ type: '', detail: v, start: '12' }, '家事援助'); return t.length === 1 && t[0] === '汎用家事'; }
 function toggleKP(i, key) {
   const r = recRows[i], kp = kpOf(r), k = kp.indexOf(key);
-  if (k >= 0) kp.splice(k, 1); else kp.push(key);
+  if (k >= 0) { kp.splice(k, 1); r.kpOff = [...new Set([...(r.kpOff || []), key])]; } else { kp.push(key); r.kpOff = (r.kpOff || []).filter(x => x !== key); }
   r.text = uniqueText(r, recRows.filter((_, j) => j !== i)); // 選び直したら文章も作り直す
   renderRecordView(); markRecDirty();
   if (kpPopRow === i) renderKpPop(i);
@@ -1673,7 +1684,7 @@ function toggleKP(i, key) {
 function recItemChips(r, i) {
   const kp = kpOf(r);
   return `<div class="chips rec-items">${kp.map(k => { const [c, it] = k.split('|'); return `<span class="chip on" title="${esc(c)}" data-k="${esc(k)}" onclick="toggleKP(${i},this.dataset.k)">${esc(c === '清掃' || c === '自立支援' || c === '洗濯' || c === '調理' ? c + '：' + it : it)}</span>`; }).join('')}
-    <button class="small" onclick="openKpPop(${i},this)">＋項目</button></div>`;
+    <button class="small" onclick="openKpPop(${i},this)">＋項目</button> <button class="small" onclick="openVPop(${i},this)">📝記録欄</button></div><div class="vsum">${esc(vSummary(r))}</div>`;
 }
 let kpPopRow = -1;
 function renderKpPop(i) {
@@ -1685,6 +1696,128 @@ function openKpPop(i, btn) {
   const pop = document.getElementById('kpPop');
   if (pop.style.display === 'block' && kpPopRow === i) { pop.style.display = 'none'; kpPopRow = -1; return; }
   kpPopRow = i; renderKpPop(i);
+  const rect = btn.getBoundingClientRect();
+  pop.style.display = 'block';
+  pop.style.left = Math.max(8, Math.min(window.scrollX + rect.left, window.innerWidth - 480)) + 'px';
+  pop.style.top = (window.scrollY + rect.bottom + 4) + 'px';
+}
+// ---- カイポケ訪問記録の入力欄（顔色・発汗・バイタル・排泄・食事・買物など） ----
+//   ・文章から自動で入る欄（顔色・発汗・その他・実施項目）＝点線のチップ
+//   ・自分で入れた欄（体温・血圧・回数・cc・金額など）＝文章に自動で書き足す
+const V_OTHER = ['環境整備', '相談援助', '情報収集・提供', '記録'];
+function vAuto(r) {
+  const t = r.text || '';
+  return {
+    変更: '無', 顔色: /顔色(が|は)?(悪|優れ|不良|すぐれ)/.test(t) ? '不良' : '良', 発汗: /発汗(が見られ|あり|有)|汗をかい/.test(t) ? '有' : '無',
+    その他: ['記録', ...(/環境を整え|整理整頓|清掃|掃除|動線|生活環境/.test(t) ? ['環境整備'] : []), ...(/相談|傾聴|不安について話|話を伺/.test(t) ? ['相談援助'] : []), ...(/報告|情報/.test(t) ? ['情報収集・提供'] : [])],
+  };
+}
+function vOf(r) { const a = vAuto(r), m = r.vin || {}; return { ...a, ...m }; }
+const SEIYO = { 爪: '爪切り', 耳: '耳掃除', 髭: '髭剃り', 髪: '整髪', 化粧: '化粧' };
+function vinSentences(r) {
+  const m = r.vin || {}, K = kubunOf((state.name || '').trim()) === '介護', who = K ? '利用者様' : '本人', head = [], tail = [];
+  const vit = [];
+  if (m.体温) vit.push(`体温${m.体温}℃`);
+  if (m.血圧上 && m.血圧下) vit.push(`血圧${m.血圧上}/${m.血圧下}mmHg`);
+  if (vit.length) head.push(`バイタル測定を行い、${vit.join('、')}であった。`);
+  if (m.顔色 === '不良') head.push('顔色が優れない様子であった。'); else if (m.顔色 === '良' && vit.length) head.push('顔色は良好であった。');
+  if (m.発汗 === '有') head.push('発汗が見られたため、汗を拭き取り衣類を整えた。');
+  const ex = [];
+  if (m.排尿回数 || m.排尿量) ex.push(`排尿${m.排尿回数 ? m.排尿回数 + '回' : ''}${m.排尿量 ? `（約${m.排尿量}cc）` : ''}`);
+  if (m.排便回数 || m.排便状態) ex.push(`排便${m.排便回数 ? m.排便回数 + '回' : ''}${m.排便状態 ? `（${m.排便状態}）` : ''}`);
+  if (ex.length) tail.push(`${ex.join('、')}を確認した。`);
+  if (m.摂食) tail.push(m.摂食 === '全部' ? '食事は全介助にて摂取していただいた。' : '食事は一部介助を行い、自力で摂取できる部分は見守った。');
+  if (m.食事量) tail.push(`食事量は${m.食事量}${/[割%％]$/.test(m.食事量) ? '' : ''}であった。`);
+  if (m.水分) tail.push(`水分を${m.水分}cc補給した。`);
+  if (m.部分浴) tail.push(`${m.部分浴}の部分浴を行った。`);
+  if (m.清拭) tail.push(`${m.清拭 === '全身' ? '全身' : '部分'}清拭を行った。`);
+  if ((m.整容 || []).length) tail.push(`${m.整容.map(x => SEIYO[x]).join('・')}を行った。`);
+  if (m.預り || m.購入 || m.お釣) tail.push(`買い物の金銭は${[m.預り && `預り${m.預り}円`, m.購入 && `購入${m.購入}円`, m.お釣 && `お釣り${m.お釣}円`].filter(Boolean).join('、')}で、${who}と一緒に確認した。`);
+  if (m.内訳) tail.push(`購入品：${m.内訳}。`);
+  return { head: head.join(''), tail: tail.join('') };
+}
+// 入力欄の文を文章に入れる（前に入れた分は外してから入れ直す）
+function withVin(r, t) {
+  const old = r.vinText || { head: '', tail: '' };
+  if (old.head) t = t.replace(old.head, ''); if (old.tail) t = t.replace(old.tail, '');
+  const v = vinSentences(r);
+  if (v.head) { const i = t.indexOf('。'); t = i >= 0 ? t.slice(0, i + 1) + v.head + t.slice(i + 1) : v.head + t; }
+  if (v.tail) {  // 最後の「様子・言葉」の文の前に入れる
+    const ss = t.split('。').filter(Boolean), last = ss[ss.length - 1] || '';
+    if (ss.length > 1 && /「|過ごされ|様子|取り組まれ|発言あり|話があった|話されて/.test(last)) t = ss.slice(0, -1).map(x => x + '。').join('') + v.tail + last + '。';
+    else t = t + v.tail;
+  }
+  r.vinText = v; return t;
+}
+// 文章に書いてある支援 → カイポケの実施項目にも自動で入れる（自分で外した項目は入れない）
+const TEXT_KP = [
+  [/水分(を)?(補給|摂取)|水分を\d/, '食事|水分補給'], [/完食/, '食事|完食'], [/洗面|洗顔/, '身体整容|洗面'], [/歯磨き|口腔/, '身体整容|口腔ケア'],
+  [/着替|更衣/, '身体整容|更衣介助'], [/洗髪/, '入浴・清拭|洗髪'], [/服薬|薬を確認|飲み忘れ/, '服薬・医療|服薬介助・確認'], [/見守/, '服薬・医療|見守り'],
+  [/移動時|移動は|付き添/, '移動|移動介助'], [/調理/, '調理|調理'], [/配膳/, '調理|配・下膳'], [/台所|キッチン/, '清掃|台所'], [/掃除|清掃/, '清掃|居室'],
+  [/ゴミ/, '清掃|ゴミ出し'], [/洗濯/, '洗濯|洗濯'], [/畳ん|収納した|衣類を整理/, '洗濯|取入れ・収納'], [/買い物/, '買物等|日常品等の買物'], [/トイレ|排泄介助/, '排泄|トイレ介助'],
+  [/陰部/, '排泄|陰部清潔介助'], [/部分浴/, '入浴・清拭|部分浴'], [/清拭/, '入浴・清拭|清拭'], [/爪切り|耳掃除|髭剃り|整髪/, '身体整容|整容'], [/全介助にて摂取|一部介助を行い/, '食事|摂食介助'],
+];
+function kpFromText(r) {
+  const kp = kpOf(r), off = r.kpOff || [], t = r.text || '', shogai = kubunOf((state.name || '').trim()) !== '介護';
+  const add = k => { if (!kp.includes(k) && !off.includes(k)) kp.push(k); };
+  TEXT_KP.forEach(([re, k]) => { if (re.test(t)) add(k); });
+  if (shogai && /声掛け/.test(t)) add('自立支援|声掛け・見守り');
+  if (/と一緒に|共に/.test(t) && kp.some(k => k.startsWith('自立支援|')) === false && shogai && /一緒に行/.test(t)) add('自立支援|掃除');
+}
+function vSummary(r) {
+  const v = vOf(r), m = r.vin || {}, x = [];
+  x.push(`顔色:${v.顔色}`, `発汗:${v.発汗}`);
+  if (m.体温) x.push(`体温:${m.体温}℃`); if (m.血圧上) x.push(`血圧:${m.血圧上}/${m.血圧下 || ''}`);
+  if (m.排尿回数 || m.排尿量) x.push(`排尿:${m.排尿回数 || ''}回${m.排尿量 ? m.排尿量 + 'cc' : ''}`);
+  if (m.排便回数 || m.排便状態) x.push(`排便:${m.排便回数 || ''}回${m.排便状態 ? ' ' + m.排便状態 : ''}`);
+  if (m.水分) x.push(`水分:${m.水分}cc`); if (m.食事量) x.push(`食事量:${m.食事量}`);
+  if (m.購入) x.push(`購入:${m.購入}円`);
+  x.push(`その他:${(v.その他 || []).join('・') || 'なし'}`);
+  if (v.変更 === '有') x.push('予定変更:有'); if ((v.加算 || []).length) x.push(`加算:${v.加算.join('・')}`);
+  return x.join('／');
+}
+let vPopRow = -1;
+function setVin(i, k, val) {
+  const r = recRows[i]; r.vin = r.vin || {};
+  if (val === '' || val == null || (Array.isArray(val) && !val.length)) delete r.vin[k]; else r.vin[k] = val;
+  // 入力に合わせて実施項目も入れる
+  const kp = kpOf(r), add = key => { if (!kp.includes(key)) kp.push(key); r.kpOff = (r.kpOff || []).filter(x => x !== key); };
+  if (k === '水分' && val) add('食事|水分補給');
+  if (k === '摂食' && val) add('食事|摂食介助');
+  if (k === '部分浴' && val) add('入浴・清拭|部分浴');
+  if (k === '清拭' && val) add('入浴・清拭|清拭');
+  if (k === '整容' && val && val.length) add('身体整容|整容');
+  if ((k === '排尿回数' || k === '排便回数') && val && !kp.some(x => x.startsWith('排泄|'))) add('排泄|トイレ介助');
+  r.text = withVin(r, r.text || ''); kpFromText(r);
+  renderRecordView(); markRecDirty(); renderVPop(i);
+}
+function toggleVArr(i, k, item) { const v = vOf(recRows[i]); const a = new Set(v[k] || []); a.has(item) ? a.delete(item) : a.add(item); setVin(i, k, [...a]); }
+function renderVPop(i) {
+  const pop = document.getElementById('vPop'), r = recRows[i]; if (!r) return;
+  const v = vOf(r), m = r.vin || {}, auto = vAuto(r);
+  const radio = (k, opts) => opts.map(o => `<span class="chip ${v[k] === o ? 'on' : ''} ${v[k] === o && m[k] == null ? 'auto' : ''}" onclick="setVin(${i},'${k}',${v[k] === o && m[k] != null ? "''" : `'${o}'`})">${o}</span>`).join('');
+  const multi = (k, opts) => opts.map(o => `<span class="chip ${(v[k] || []).includes(o) ? 'on' : ''} ${m[k] == null && (auto[k] || []).includes(o) ? 'auto' : ''}" onclick="toggleVArr(${i},'${k}','${o}')">${o}</span>`).join('');
+  const num = (k, w, unit, type = 'number') => `<input type="${type}" ${w ? `style="width:${w}px"` : ''} value="${esc(m[k] || '')}" onchange="setVin(${i},'${k}',this.value.trim())">${unit || ''}`;
+  pop.innerHTML = `<div class="head"><b>訪問記録の欄（入れると文章に自動で反映）</b><button class="small" onclick="document.getElementById('vPop').style.display='none';vPopRow=-1">閉じる</button></div>
+  <div style="font-size:11px;color:var(--muted)">点線＝文章から自動で入った値。押すと自分で選び直せます。</div>
+  <div class="cat">予定の変更・特定加算</div><div class="row chips">${radio('変更', ['有', '無'])}　${multi('加算', ['初回', '緊急'])}</div>
+  <div class="cat">顔色・発汗</div><div class="row chips">顔色 ${radio('顔色', ['良', '不良'])}　発汗 ${radio('発汗', ['有', '無'])}</div>
+  <div class="cat">バイタル</div><div class="row">体温 ${num('体温', 56, '℃')}　血圧 ${num('血圧上', 50)} / ${num('血圧下', 50, 'mmHg')}</div>
+  <div class="cat">その他</div><div class="row chips">${multi('その他', V_OTHER)}</div>
+  <div class="cat">排泄</div><div class="row">排尿 回数 ${num('排尿回数', 40)} 量 ${num('排尿量', 56, 'cc')}</div>
+  <div class="row" style="margin-top:4px">排便 回数 ${num('排便回数', 40)} 状態 ${num('排便状態', 120, '', 'text')}</div>
+  <div class="cat">食事</div><div class="row chips">摂食介助 ${radio('摂食', ['全部', '一部'])}</div>
+  <div class="row" style="margin-top:4px">食事量 ${num('食事量', 70, '', 'text')}　水分補給 ${num('水分', 56, 'cc')}</div>
+  <div class="cat">入浴・清拭／身体整容</div><div class="row chips">部分浴 ${radio('部分浴', ['手', '足'])}　清拭 ${radio('清拭', ['全身', '部分'])}</div>
+  <div class="row chips" style="margin-top:4px">整容 ${multi('整容', ['爪', '耳', '髭', '髪', '化粧'])}</div>
+  <div class="cat">買物等</div><div class="row">預り ${num('預り', 64, '円')} 購入 ${num('購入', 64, '円')} お釣 ${num('お釣', 64, '円')}</div>
+  <div class="row" style="margin-top:4px">内訳 <input type="text" class="wide" value="${esc(m.内訳 || '')}" onchange="setVin(${i},'内訳',this.value.trim())"></div>`;
+}
+function openVPop(i, btn) {
+  const pop = document.getElementById('vPop');
+  if (pop.style.display === 'block' && vPopRow === i) { pop.style.display = 'none'; vPopRow = -1; return; }
+  document.getElementById('kpPop').style.display = 'none'; kpPopRow = -1;
+  vPopRow = i; renderVPop(i);
   const rect = btn.getBoundingClientRect();
   pop.style.display = 'block';
   pop.style.left = Math.max(8, Math.min(window.scrollX + rect.left, window.innerWidth - 480)) + 'px';
@@ -2102,6 +2235,7 @@ function uniqueText(row, others) {
     const bank = document.querySelector('input[name=recStyle]:checked').value === 'short' ? SHORT : PB;
     for (const c of [...bank.締め].sort(() => Math.random() - .5)) { if (c && !used.has(normText(t + c))) { t += c; break; } }
   }
+  t = withVin(row, t); const keep = row.text; row.text = t; kpFromText(row); row.text = keep;
   return t;
 }
 function dupGroups() {
@@ -2127,7 +2261,7 @@ function renderRecordView() {
       ${r.flag ? `<span class="flag">${esc(r.flag)}</span>` : ''}</td>
     <td class="staff"><select onchange="recRows[${i}].staff=this.value;recRows[${i}].staffEdited=true">${staffOptions(r.staff)}</select></td>
     <td class="kind">${r.kind}<br><small style="color:var(--muted)">${esc(r.e.type)}</small>${recItemChips(r, i)}</td>
-    <td class="txt">${ngIdx.has(i) ? ngHits(r.text).map(w => `<span class="ng-badge">NG「${esc(w)}」</span>`).join('') : ''}${dupIdx.has(i) ? `<span class="dup-badge">⚠ 同じ文章（${dupIdx.get(i)}）</span>` : ''}<textarea oninput="recRows[${i}].text=this.value" onchange="renderRecordView()">${esc(r.text)}</textarea></td>
+    <td class="txt">${ngIdx.has(i) ? ngHits(r.text).map(w => `<span class="ng-badge">NG「${esc(w)}」</span>`).join('') : ''}${dupIdx.has(i) ? `<span class="dup-badge">⚠ 同じ文章（${dupIdx.get(i)}）</span>` : ''}<textarea oninput="recRows[${i}].text=this.value" onchange="kpFromText(recRows[${i}]);renderRecordView()">${esc(r.text)}</textarea></td>
     <td class="act"><button class="small" title="別の言い回し" onclick="recRows[${i}].text=uniqueText(recRows[${i}],recRows.filter((_,j)=>j!==${i}));renderRecordView()">↻</button>
       <button class="small" title="文章をコピー" onclick="copyText(recRows[${i}].text,this)">📋</button><br>
       <button class="small" title="感情・状態を選んで文に追加" style="margin-top:4px" onclick="openStatePop(${i},this)">😊様子</button></td>
