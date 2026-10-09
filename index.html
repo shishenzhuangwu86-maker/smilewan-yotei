@@ -1218,7 +1218,7 @@ async function saveRecords(opt = {}) {
   for (const [month, rs] of Object.entries(byMonth)) {
     const id = docId(name) + '_' + month, prev = getColl('records')[id];
     const map = new Map((prev?.rows || []).map(x => [x.date + ' ' + x.start, x]));
-    rs.forEach(r => { const x = { date: ymd(r.date), start: r.e.start || '', end: r.e.end || '', type: r.e.type || '', detail: r.e.detail || '', staff: r.staff || '', kind: r.kind, text: r.text || '', flag: r.flag || '', kp: kpOf(r), vin: r.vin || {}, kpOff: r.kpOff || [], vinText: r.vinText || null, v: vOf(r) }; map.set(x.date + ' ' + x.start, x); n++; });
+    rs.forEach(r => { const x = { date: ymd(r.date), start: r.e.start || '', end: r.e.end || '', type: r.e.type || '', detail: r.e.detail || '', staff: r.staff || '', kind: r.kind, text: r.text || '', flag: r.flag || '', kp: kpOf(r), kpText: kpAll(r).filter(k => !kpOf(r).includes(k)), vin: r.vin || {}, kpOff: r.kpOff || [], vinText: r.vinText || null, v: vOf(r) }; map.set(x.date + ' ' + x.start, x); n++; });
     const list = [...map.values()].sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start));
     ok = (await putDoc('records', id, { name, month, rows: list, updatedAt: new Date().toISOString() })) && ok;
   }
@@ -1237,7 +1237,7 @@ function openSavedRecords() {
   const d = month && getColl('records')[docId(name) + '_' + month];
   if (!d) { alert('開く記録を選んでください'); return; }
   if (recRows.length && !confirm('今の表の内容を、保存した記録に入れ替えますか？')) return;
-  recRows = d.rows.map(x => ({ date: new Date(x.date + 'T00:00:00'), e: { ...emptyEntry(), type: x.type, start: x.start, end: x.end, detail: x.detail }, kind: x.kind, staff: x.staff, staffEdited: true, on: true, flag: x.flag || '', text: x.text, vin: x.vin || {}, kpOff: x.kpOff || [], vinText: x.vinText || null, kp: x.kp || autoKP({ type: x.type, detail: x.detail }) }))
+  recRows = d.rows.map(x => ({ date: new Date(x.date + 'T00:00:00'), e: { ...emptyEntry(), type: x.type, start: x.start, end: x.end, detail: x.detail }, kind: x.kind, staff: x.staff, staffEdited: true, on: true, flag: x.flag || '', text: x.text, vin: x.vin || {}, kpOff: x.kpOff || [], vinText: x.vinText || null, kp: cleanKp(x) }))
     .sort((a, b) => (b.date - a.date) || ((b.e.start || '') > (a.e.start || '') ? 1 : -1));
   const [y, m] = month.split('-').map(Number);
   document.getElementById('recFrom').value = `${month}-01`; document.getElementById('recTo').value = `${month}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
@@ -1987,8 +1987,9 @@ function kpOf(row) { if (!row.kp) row.kp = autoKP(row.e); return row.kp; }
 function rowE(row) { const kp = kpOf(row); return { ...row.e, detail: kp.map(k => kpPhrase(k, row)).filter(Boolean).join('\n') }; }
 function itemUnmapped(v) { if (/^[（(].*[）)]$/.test(v) && /生活|身体|\d/.test(v)) return false; const t = tagsFor({ type: '', detail: v, start: '12' }, '家事援助'); return t.length === 1 && t[0] === '汎用家事'; }
 function toggleKP(i, key) {
-  const r = recRows[i], kp = kpOf(r), k = kp.indexOf(key);
-  if (k >= 0) { kp.splice(k, 1); r.kpOff = [...new Set([...(r.kpOff || []), key])]; } else { kp.push(key); r.kpOff = (r.kpOff || []).filter(x => x !== key); }
+  const r = recRows[i], kp = kpOf(r), k = kp.indexOf(key), shown = kpAll(r).includes(key);
+  if (shown) { if (k >= 0) kp.splice(k, 1); r.kpOff = [...new Set([...(r.kpOff || []), key])]; } else { kp.push(key); r.kpOff = (r.kpOff || []).filter(x => x !== key); }
+  if (k < 0 && shown) { kpFromText(r); renderRecordView(); markRecDirty(); if (kpPopRow === i) renderKpPop(i); return; } // 読み取りだけの項目なら文章はそのまま
   r.text = uniqueText(r, recRows.filter((_, j) => j !== i)); // 選び直したら文章も作り直す
   renderRecordView(); markRecDirty();
   if (kpPopRow === i) renderKpPop(i);
@@ -2008,14 +2009,14 @@ function kpFieldsHtml(r) {
   return x.join('');
 }
 function kpGroupsHtml(r, i) {
-  const kp = kpOf(r), all = !!r.showAllKp;
+  const kp = kpAll(r), all = !!r.showAllKp;
   return KP.map(([c, items]) => {
     const on = items.filter(it => kp.includes(c + '|' + it)); if (!on.length && !all) return '';
     return `<span class="kpg"><b>${c}</b>${(all ? items : on).map(it => { const k = c + '|' + it; return `<span class="chip ${kp.includes(k) ? 'on' : ''}" data-k="${esc(k)}" onclick="toggleKP(${i},this.dataset.k)">${esc(it)}</span>`; }).join('')}</span>`;
   }).join('') || '<span class="hint" style="margin:0">実施項目なし（「すべての項目を表示」から選べます）</span>';
 }
 function kpLinesHtml(r) {
-  const kp = kpOf(r);
+  const kp = kpAll(r);
   return KP.map(([c, items]) => { const on = items.filter(it => kp.includes(c + '|' + it)); return on.length ? `<div><b>${c}</b> ${on.map(x => `<i>☑${esc(x)}</i>`).join('')}</div>` : ''; }).join('');
 }
 function kpFieldsLine(r) {
@@ -2045,22 +2046,22 @@ function recCheckRow(r, i) {
   </div></td></tr>`;
 }
 function checkText(r) {
-  const kp = kpOf(r), f = kpFieldsLine(r).replace(/<[^>]+>/g, ''), g = KP.map(([c, items]) => { const on = items.filter(it => kp.includes(c + '|' + it)); return on.length ? `${c} ${on.map(x => '☑' + x).join(' ')}` : ''; }).filter(Boolean);
+  const kp = kpAll(r), f = kpFieldsLine(r).replace(/<[^>]+>/g, ''), g = KP.map(([c, items]) => { const on = items.filter(it => kp.includes(c + '|' + it)); return on.length ? `${c} ${on.map(x => '☑' + x).join(' ')}` : ''; }).filter(Boolean);
   return [f, ...g].join('／');
 }
 function kaipokeText(r) {
-  const kp = kpOf(r), x = [vSummary(r)];
+  const kp = kpAll(r), x = [vSummary(r)];
   KP.forEach(([c, items]) => { const on = items.filter(it => kp.includes(c + '|' + it)); if (on.length) x.push(`${c}：${on.join('・')}`); });
   return x.join('\n');
 }
 function recItemChips(r, i) {
-  const kp = kpOf(r);
+  const kp = kpAll(r);
   return `<div class="chips rec-items">${kp.map(k => { const [c, it] = k.split('|'); return `<span class="chip on" title="${esc(c)}" data-k="${esc(k)}" onclick="toggleKP(${i},this.dataset.k)">${esc(c === '清掃' || c === '自立支援' || c === '洗濯' || c === '調理' ? c + '：' + it : it)}</span>`; }).join('')}
     <button class="small" onclick="openKpPop(${i},this)">＋項目</button> <button class="small" onclick="openVPop(${i},this)">📝記録欄</button></div><div class="vsum">${esc(vSummary(r))}</div>`;
 }
 let kpPopRow = -1;
 function renderKpPop(i) {
-  const pop = document.getElementById('kpPop'), kp = kpOf(recRows[i]);
+  const pop = document.getElementById('kpPop'), kp = kpAll(recRows[i]);
   pop.innerHTML = `<div class="head"><b>カイポケの実施項目（押して選ぶ・外す）</b><button class="small" onclick="document.getElementById('kpPop').style.display='none';kpPopRow=-1">閉じる</button></div>` +
     KP.map(([c, items]) => `<div class="cat">${c}</div><div class="chips">${items.map(it => { const k = c + '|' + it; return `<span class="chip ${kp.includes(k) ? 'on' : ''}" data-k="${esc(k)}" onclick="toggleKP(${i},this.dataset.k)">${esc(it)}</span>`; }).join('')}</div>`).join('');
 }
@@ -2145,13 +2146,24 @@ const TEXT_KP = [
   [/ゴミ/, '清掃|ゴミ出し'], [/洗濯/, '洗濯|洗濯'], [/畳ん|収納した|衣類を整理/, '洗濯|取入れ・収納'], [/買い物/, '買物等|日常品等の買物'], [/トイレ|排泄介助/, '排泄|トイレ介助'],
   [/陰部/, '排泄|陰部清潔介助'], [/食べ残し|残され/, '食事|食べ残しあり'], [/おむつ交換|オムツ交換/, '排泄|おむつ交換'], [/パッド交換/, '排泄|パッド交換'], [/ポータブルトイレ/, '排泄|ポータブルトイレ介助'], [/体位変換/, '移動|体位変換'], [/移乗/, '移動|移乗介助'], [/通院/, '移動|通院介助'], [/点眼/, '服薬・医療|点眼'], [/塗布|軟膏/, '服薬・医療|薬の塗布'], [/シャワー浴/, '入浴・清拭|シャワー浴'], [/シーツ|カバー交換/, '衣類・寝具|シーツ・カバー交換'], [/ベッドメイク/, '衣類・寝具|ベッドメイク'], [/布団/, '衣類・寝具|布団干し'], [/薬の受け?取り/, '買物等|薬の受取り'], [/下拵え|下ごしらえ/, '調理|下拵え'], [/トイレ(の)?(清掃|掃除)/, '清掃|トイレ'], [/浴室(の)?(清掃|掃除)/, '清掃|浴室'], [/玄関/, '清掃|玄関'], [/干し|物干/, '洗濯|乾燥（物干し）'], [/アイロン/, '洗濯|アイロン'], [/水分補給|水分を/, '食事|水分補給'], [/姿勢/, '食事|姿勢の確保'], [/部分浴|手浴|足浴/, '入浴・清拭|部分浴'], [/清拭/, '入浴・清拭|清拭'], [/爪切り|耳掃除|髭剃り|整髪/, '身体整容|整容'], [/全介助にて摂取|一部介助を行い/, '食事|摂食介助'],
 ];
+// 文章・記録欄から読み取った実施項目は「表示・カイポケ用」だけ（r.kpText）。文章を作る材料（r.kp＝予定表・アセス・手で選んだ物）には混ぜない
 function kpFromText(r) {
-  const kp = kpOf(r), off = r.kpOff || [], t = r.text || '', shogai = kubunOf((state.name || '').trim()) !== '介護';
-  const add = k => { if (!kp.includes(k) && !off.includes(k)) kp.push(k); };
+  const kp = kpOf(r), off = r.kpOff || [], t = r.text || '', shogai = kubunOf((state.name || '').trim()) !== '介護', m = r.vin || {}, out = new Set();
+  const add = k => { if (!kp.includes(k) && !off.includes(k)) out.add(k); };
   TEXT_KP.forEach(([re, k]) => { if (re.test(t)) add(k); });
   if (shogai && /声掛け/.test(t)) add('自立支援|声掛け・見守り');
-  if (/と一緒に|共に/.test(t) && kp.some(k => k.startsWith('自立支援|')) === false && shogai && /一緒に行/.test(t)) add('自立支援|掃除');
+  if (m.水分) add('食事|水分補給'); if (m.摂食) add('食事|摂食介助'); if (m.部分浴) add('入浴・清拭|部分浴'); if (m.清拭) add('入浴・清拭|清拭');
+  if ((m.整容 || []).length) add('身体整容|整容'); if ((m.排尿回数 || m.排便回数) && !kp.some(x => x.startsWith('排泄|'))) add('排泄|トイレ介助');
+  r.kpText = [...out];
 }
+// 10/7〜10/9 の版で文章から材料に混ざった項目（声掛け→自立支援 など）を外す。予定表から出る項目・手で選んだ物は残す
+function cleanKp(x) {
+  if (!x.kp) return autoKP({ type: x.type, detail: x.detail });
+  if (x.kpText) return x.kp; // 新しい版で保存した物はそのまま
+  const base = autoKPFor({ type: x.type, detail: x.detail, start: x.start, end: x.end }, (state.name || '').trim()), fromText = new Set([...TEXT_KP.map(([, k]) => k), '自立支援|声掛け・見守り']);
+  return x.kp.filter(k => base.includes(k) || !fromText.has(k) || new RegExp(k.split('|')[1].slice(0, 2)).test(x.detail || ''));
+}
+function kpAll(r) { if (!r.kpText) kpFromText(r); return [...new Set([...kpOf(r), ...r.kpText])]; }
 function vSummary(r) {
   const v = vOf(r), x = [`顔色:${v.顔色}`, `発汗:${v.発汗}`];
   if (v.体温) x.push(`体温:${v.体温}℃`); if (v.血圧上) x.push(`血圧:${v.血圧上}/${v.血圧下 || ''}`);
@@ -2172,14 +2184,6 @@ function liveV(i, ta) {  // 入力中にまとめ・記録欄を更新（文章�
 function setVin(i, k, val) {
   const r = recRows[i]; r.vin = r.vin || {};
   if (val === '' || val == null || (Array.isArray(val) && !val.length)) delete r.vin[k]; else r.vin[k] = val;
-  // 入力に合わせて実施項目も入れる
-  const kp = kpOf(r), add = key => { if (!kp.includes(key)) kp.push(key); r.kpOff = (r.kpOff || []).filter(x => x !== key); };
-  if (k === '水分' && val) add('食事|水分補給');
-  if (k === '摂食' && val) add('食事|摂食介助');
-  if (k === '部分浴' && val) add('入浴・清拭|部分浴');
-  if (k === '清拭' && val) add('入浴・清拭|清拭');
-  if (k === '整容' && val && val.length) add('身体整容|整容');
-  if ((k === '排尿回数' || k === '排便回数') && val && !kp.some(x => x.startsWith('排泄|'))) add('排泄|トイレ介助');
   r.text = withVin(r, r.text || ''); kpFromText(r);
   renderRecordView(); markRecDirty(); renderVPop(i);
 }
@@ -2215,7 +2219,7 @@ function openVPop(i, btn) {
   pop.style.left = Math.max(8, Math.min(window.scrollX + rect.left, window.innerWidth - 480)) + 'px';
   pop.style.top = (window.scrollY + rect.bottom + 4) + 'px';
 }
-function kpText(row) { return kpOf(row).map(k => k.split('|')[1]).join('／'); }
+function kpText(row) { return kpAll(row).map(k => k.split('|')[1]).join('／'); }
 // ---- 特記事項の書き方（見本「介護 高山辰雄9月特記事項」）。区分で書き分け ----
 //   介護＝ヘルパーが行う（〜を行った／介助した）
 //   障害＝自立に向けた支援（できる部分はご自身で、難しい部分を支援／一緒に行う／見守り）
