@@ -174,6 +174,8 @@
   .chkcol .kpf .warn { color: var(--danger); font-weight: bold; }
   .chkcol .kpl div { margin: 1px 0; }
   .chkcol .kpl b { color: var(--muted); font-weight: normal; font-size: 11px; }
+  .chkcol .kpl i.rel { text-decoration: underline dotted; text-underline-offset: 3px; }
+  .chkcol .kpl i[title] { cursor: help; }
   .chkcol .kp-act { margin-top: 4px; display: flex; gap: 4px; flex-wrap: wrap; }
   @media print { .chkcol .kp-act { display: none; } }
   .rec-table td.txt textarea { width: 100%; min-height: 58px; font: inherit; font-size: 13px; line-height: 1.45; padding: 4px 6px; border: 1px solid transparent; border-radius: 3px; resize: vertical; background: transparent; color: var(--text); }
@@ -505,7 +507,7 @@
         <li>行ごとに確認・修正する
           <ul>
             <li><b>実施項目</b>：カイポケでチェックする項目が青く選ばれている。押すと外れ、「＋項目」でカイポケと同じ並びの一覧から足せる</li>
-            <li><b>チェック欄</b>：記録の右の「チェック」列に、記録欄の値（顔色・発汗・体温・血圧…）と、チェックした実施項目をカイポケと同じ並びで ☑ 表示（PDF・印刷・Wordにも出る。Wordでは各記録の下に小さい灰色の1行「チェック：…」。いらないときは「Word・PDFにチェック項目も入れる」を外す）。「✎ 項目」で選び直し、「📝 記録欄」で数字を入れる。「📋」でカイポケ用にコピー</li>
+            <li><b>チェック欄</b>：記録の右の「チェック」列に、記録欄の値（顔色・発汗・体温・血圧…）と、チェックした実施項目をカイポケと同じ並びで ☑ 表示（PDF・印刷・Wordにも出る。Wordでは各記録の下に小さい灰色の1行「チェック：…」。いらないときは「Word・PDFにチェック項目も入れる」を外す）。選び方：①予定表 ②アセスメント（洗髪介助・口腔清潔など）③文章に書いてある支援 ④記録欄の値 ⑤関連してセットで行う支援（入浴→更衣介助、通院→外出準備・帰宅受入、車いす→移乗介助、障害の声掛け→場面の小項目）。チェックにマウスを乗せると理由が出る（点線の下線＝関連で選んだ物）。調理の訪問は献立欄に料理名。「✎ 項目」で選び直し、「📝 記録欄」で数字を入れる。「📋」でカイポケ用にコピー</li>
             <li><b>📝記録欄</b>：カイポケの欄（顔色・発汗・体温・血圧・排尿／排便の回数・量・食事量・水分cc・部分浴・清拭・整容・買物の金額と内訳・その他・予定の変更・加算）。入れた数字は文章に自動で書き足され、消すと文章からも消える。文章に書いた体温・血圧・排尿／排便・食事量・水分cc・清拭・整容・金額なども自動で欄に入る（点線。文章を打っている途中でも反映）。押せば選び直せる</li>
             <li><b>🛒 買い物タブ</b>：利用者を選んで「🍱 献立と買い物リストを作る」。買い物リストはチェックしながら使える（チェックは保存され、他の端末でも同じ）。日用品にチェックすると「今日買った」になる。周期の設定は下の「⚙ 日用品の買う周期」を開く。「LINE用にコピー」「印刷」もある。</li>
             <li><b>🍱 献立・買い物リスト</b>：予定表の調理の曜日・食事ごとに献立を作り、材料をまとめた買い物リストも作る。アセスメントの病名（高血圧→減塩、糖尿病→糖質控えめ）・義歯（やわらかい料理）・調理の力（障害→簡単な料理）と、「食べられない物」欄・NGの言葉を外して作る。献立には1人分の量（例：豚肉80g・玉ねぎ1/2個、ご飯1膳150g）が付き、買い物リストは1週間の合計量（買う単位に切り上げ）と米の合数、生活に必要な日用品（予定表の支援・アセスメントから：洗剤・トイレットペーパー・おむつ・入れ歯洗浄剤など）も出る。作った献立は記録の「調理」の文に入る。日用品は「買う周期（日）」と「前回買った日」を利用者ごとに持ち、今週買う時期の物だけ買い物リストに入る（周期の初期値は1人暮らしの目安。「✓今日買った」か、記録に「購入品：トイレットペーパー」などと書いて保存すると前回買った日が更新される）</li>
@@ -2020,7 +2022,7 @@ function kpGroupsHtml(r, i) {
 }
 function kpLinesHtml(r) {
   const kp = kpAll(r);
-  return KP.map(([c, items]) => { const on = items.filter(it => kp.includes(c + '|' + it)); return on.length ? `<div><b>${c}</b> ${on.map(x => `<i>☑${esc(x)}</i>`).join('')}</div>` : ''; }).join('');
+  return KP.map(([c, items]) => { const on = items.filter(it => kp.includes(c + '|' + it)); return on.length ? `<div><b>${c}</b> ${on.map(x => { const w = (r.kpSrc || {})[c + '|' + x] || ''; return `<i title="${esc(w)}"${/^関連/.test(w) ? ' class="rel"' : ''}>☑${esc(x)}</i>`; }).join('')}</div>` : ''; }).join('');
 }
 function kpFieldsLine(r) {
   const v = vOf(r), x = [], f = (k, val, warn) => x.push(`<span${warn ? ' class="warn"' : ''}>${k} ${esc(val)}</span>`);
@@ -2031,6 +2033,7 @@ function kpFieldsLine(r) {
   if (v.排便回数 || v.排便状態) f('排便', `${v.排便回数 ? v.排便回数 + '回' : ''}${v.排便状態 || ''}`);
   if (v.摂食) f('摂食介助', v.摂食); if (v.食事量) f('食事量', v.食事量); if (v.水分) f('水分', v.水分 + 'cc');
   if (v.部分浴) f('部分浴', v.部分浴); if (v.清拭) f('清拭', v.清拭); if ((v.整容 || []).length) f('整容', v.整容.join('・'));
+  if (v.献立) f('献立', v.献立);
   if (v.預り) f('預り', v.預り + '円'); if (v.購入) f('購入', v.購入 + '円'); if (v.お釣) f('お釣', v.お釣 + '円');
   f('その他', (v.その他 || []).join('・') || 'なし');
   return x.join(' ');
@@ -2066,7 +2069,8 @@ let kpPopRow = -1;
 function renderKpPop(i) {
   const pop = document.getElementById('kpPop'), kp = kpAll(recRows[i]);
   pop.innerHTML = `<div class="head"><b>カイポケの実施項目（押して選ぶ・外す）</b><button class="small" onclick="document.getElementById('kpPop').style.display='none';kpPopRow=-1">閉じる</button></div>` +
-    KP.map(([c, items]) => `<div class="cat">${c}</div><div class="chips">${items.map(it => { const k = c + '|' + it; return `<span class="chip ${kp.includes(k) ? 'on' : ''}" data-k="${esc(k)}" onclick="toggleKP(${i},this.dataset.k)">${esc(it)}</span>`; }).join('')}</div>`).join('');
+    KP.map(([c, items]) => `<div class="cat">${c}</div><div class="chips">${items.map(it => { const k = c + '|' + it, w = (recRows[i].kpSrc || {})[k] || ''; return `<span class="chip ${kp.includes(k) ? 'on' : ''}" title="${esc(w)}" data-k="${esc(k)}" onclick="toggleKP(${i},this.dataset.k)">${esc(it)}</span>`; }).join('')}</div>`).join('') +
+    `<div class="hint" style="margin-top:6px">項目にマウスを乗せると、選んだ理由（予定表・アセスメント・文章・関連）が出ます。</div>`;
 }
 function openKpPop(i, btn) {
   const pop = document.getElementById('kpPop');
@@ -2100,7 +2104,9 @@ function vAuto(r) {
   v.整容 = [['爪', /爪切り|爪を切/], ['耳', /耳掃除|耳垢/], ['髭', /髭剃り|ひげ剃り|髭を剃/], ['髪', /整髪|髪を整え|ブラッシング/], ['化粧', /化粧/]].filter(([, re]) => re.test(t)).map(([k]) => k);
   v.預り = num(m(/預か?り(?:金)?\s*(\d[\d,]*)\s*円/)); v.購入 = num(m(/購入(?:金額)?\s*(\d[\d,]*)\s*円/, /(\d[\d,]*)\s*円(?:分)?(?:を|で)?購入/)); v.お釣 = num(m(/お?釣り?\s*(\d[\d,]*)\s*円/));
   v.内訳 = m(/購入品[:：は]\s*([^。]+)/);
-  v.その他 = ['記録', ...(/環境を整え|整理整頓|清掃|掃除|動線|生活環境|環境整備/.test(t) ? ['環境整備'] : []), ...(/相談|傾聴|不安について話|話を伺/.test(t) ? ['相談援助'] : []), ...(/報告|情報/.test(t) ? ['情報収集・提供'] : [])];
+  v.その他 = ['記録', ...(/環境を整え|整理整頓|清掃|掃除|動線|生活環境|環境整備/.test(t) ? ['環境整備'] : []), ...(/相談|傾聴|不安について話|話を伺/.test(t) ? ['相談援助'] : []), ...(/(責任者|ケアマネ|家族|事業所|主治医|看護|医師)[^。]*(報告|連絡|伝え|相談)|報告した|情報(を)?(提供|共有|収集)|連絡帳/.test(t) ? ['情報収集・提供'] : [])];
+  if (kpOf(r).some(k => /^清掃\||^自立支援\|(掃除|ベッドメイク|衣類)/.test(k)) && !v.その他.includes('環境整備')) v.その他.push('環境整備');
+  { const mn = /調理/.test(kpOf(r).join(' ')) ? menuFor(r, mealOf(r)) : ''; const mt = t.match(/献立に沿って(.+?)を調理|（([^）]+)）の(準備|調理)/); v.献立 = mn || (mt ? (mt[1] || mt[2]) : ''); }
   Object.keys(v).forEach(k => { if (v[k] === '' || v[k] == null) delete v[k]; });
   return v;
 }
@@ -2151,24 +2157,42 @@ const TEXT_KP = [
 ];
 // 文章・記録欄から読み取った実施項目は「表示・カイポケ用」だけ（r.kpText）。文章を作る材料（r.kp＝予定表・アセス・手で選んだ物）には混ぜない
 function kpFromText(r) {
-  const kp = kpOf(r), off = r.kpOff || [], t = (r.text || '').split('。').filter(x => !/に続けて/.test(x)).join('。'), shogai = kubunOf((state.name || '').trim()) !== '介護', m = r.vin || {}, out = new Set();
-  const add = k => { if (!kp.includes(k) && !off.includes(k)) out.add(k); };
+  const kp = kpOf(r), off = r.kpOff || [], t = (r.text || '').split('。').filter(x => !/に続けて/.test(x)).join('。'), name = (state.name || '').trim();
+  const shogai = kubunOf(name) !== '介護', m = r.vin || {}, out = new Set(), src = {}, a = assessOf(name) || {};
+  const det = (r.e.type || '') + ' ' + (r.e.detail || '');
+  // どこから選んだか（チェックにマウスを乗せると出る）
+  const base = autoKP(r.e), withAs = autoKPFor(r.e, name);
+  kp.forEach(k => { src[k] = base.includes(k) ? '予定表から' : withAs.includes(k) ? 'アセスメントから' : '手で選択'; });
+  const add = (k, why) => { if (!kp.includes(k) && !off.includes(k) && !out.has(k)) { out.add(k); src[k] = why; } };
   const together = kp.some(k => k.startsWith('自立支援|')) && r.kind !== '家事援助';
   const body = r.kind !== '家事援助';
-  TEXT_KP.forEach(([re, k, sc]) => { if ((sc === 'body' && !body) || (sc === 'house' && body)) return; if (together && /^(調理|清掃|洗濯|買物等|衣類・寝具)\|/.test(k)) return; if (re.test(t)) add(k); });
-  if (body) t.split('。').forEach(x => { if (/移動|歩行|付き添|手引き/.test(x) && !/動線/.test(x)) add('移動|移動介助'); });
-  if (shogai && row_isBody(r) && /声掛け|見守/.test(t)) {
-    add('自立支援|声掛け・見守り');
-    const has = c => [...kp, ...out].some(k => k.startsWith(c + '|')), all = [...kp, ...out].join(' ') + ' ' + (r.e.type || '') + ' ' + (r.e.detail || '');
-    if (has('起床・就寝') || /起床|就寝/.test(all)) add('自立支援|起床就寝介助');
-    if (has('入浴・清拭') || has('身体整容') || /入浴|整容|更衣|洗面|着替/.test(all + t)) add('自立支援|清拭・入浴・身体整容');
-    if (kp.some(k => /^(排泄|食事)\|/.test(k)) || /排泄|トイレ|食事/.test((r.e.type || '') + ' ' + (r.e.detail || ''))) add('自立支援|排泄・食事');
-    if (/服薬|薬/.test(all)) add('自立支援|服薬');
-    if (/通院|外出/.test(all)) add('自立支援|通院・外出介助');
+  // ① 文章に書いてある支援
+  TEXT_KP.forEach(([re, k, sc]) => { if ((sc === 'body' && !body) || (sc === 'house' && body)) return; if (together && /^(調理|清掃|洗濯|買物等|衣類・寝具)\|/.test(k)) return; const x = t.match(re); if (x) add(k, `文章から（「${x[0]}」）`); });
+  if (body) t.split('。').forEach(x => { if (/移動|歩行|付き添|手引き/.test(x) && !/動線/.test(x)) add('移動|移動介助', '文章から（移動の介助）'); });
+  // ② 記録欄に入れた値
+  if (m.水分) add('食事|水分補給', '記録欄（水分）'); if (m.摂食) add('食事|摂食介助', '記録欄（摂食介助）'); if (m.部分浴) add('入浴・清拭|部分浴', '記録欄（部分浴）'); if (m.清拭) add('入浴・清拭|清拭', '記録欄（清拭）');
+  if ((m.整容 || []).length) add('身体整容|整容', '記録欄（整容）');
+  if ((m.排尿回数 || m.排便回数) && ![...kp, ...out].some(x => x.startsWith('排泄|'))) add('排泄|トイレ介助', '記録欄（排尿・排便）');
+  // ③ 関連してセットで行う支援
+  const now = [...kp, ...out], has = k => now.includes(k), hasC = c => now.some(k => k.startsWith(c + '|'));
+  if (has('入浴・清拭|入浴介助') || has('入浴・清拭|シャワー浴')) add('身体整容|更衣介助', '関連（入浴の前後の着脱）');
+  if (has('移動|通院介助')) { add('移動|外出準備介助', '関連（通院の外出準備）'); add('移動|帰宅受入介助', '関連（通院からの帰宅）'); if (/院内|受付|会計|診察/.test(t)) add('服薬・医療|院内介助', '文章から（院内での介助）'); }
+  if (body && /同行|一緒に買い物|買い物に付き添/.test(det + t)) add('移動|買物介助', '関連（買い物の同行）');
+  const chair = /車いす|車椅子/.test((a.walkAid || '') + JSON.stringify(a.itemNotes || {}));
+  if (chair && body && (has('移動|移動介助') || has('移動|通院介助') || has('入浴・清拭|入浴介助') || has('排泄|トイレ介助'))) add('移動|移乗介助', '関連（車いすからの移乗）');
+  if (has('調理|調理') && /朝食|昼食|夕食|食事|提供|配膳/.test(det + t)) add('調理|配・下膳', '関連（作った食事の配膳）');
+  if (/おむつ|オムツ|紙パンツ/.test(JSON.stringify(a)) && hasC('排泄') && /交換/.test(t)) add('排泄|おむつ交換', '文章・アセスメントから（おむつ）');
+  // ④ 障害：声掛け・見守りと、その場面
+  if (shogai && body && /声掛け|見守/.test(t)) {
+    add('自立支援|声掛け・見守り', '文章から（声掛け・見守り）');
+    const all = [...kp, ...out].map(k => k.split('|')[1]).filter(x => !/見守り/.test(x)).join(' ') + ' ' + det;
+    if (/起床|就寝/.test(all)) add('自立支援|起床就寝介助', '関連（起床・就寝の声掛け）');
+    if (/入浴|整容|更衣|洗面|着替/.test(all + t)) add('自立支援|清拭・入浴・身体整容', '関連（入浴・身支度の声掛け）');
+    if (kp.some(k => /^(排泄|食事)\|/.test(k)) || /排泄|トイレ|食事/.test(det)) add('自立支援|排泄・食事', '関連（排泄・食事の声掛け）');
+    if (/服薬介助|服薬|薬/.test(all)) add('自立支援|服薬', '関連（服薬の声掛け）');
+    if (/通院|外出/.test(all)) add('自立支援|通院・外出介助', '関連（通院・外出の声掛け）');
   }
-  if (m.水分) add('食事|水分補給'); if (m.摂食) add('食事|摂食介助'); if (m.部分浴) add('入浴・清拭|部分浴'); if (m.清拭) add('入浴・清拭|清拭');
-  if ((m.整容 || []).length) add('身体整容|整容'); if ((m.排尿回数 || m.排便回数) && !kp.some(x => x.startsWith('排泄|'))) add('排泄|トイレ介助');
-  r.kpText = [...out];
+  r.kpText = [...out]; r.kpSrc = src;
 }
 // 10/7〜10/9 の版で文章から材料に混ざった項目（声掛け→自立支援 など）を外す。予定表から出る項目・手で選んだ物は残す
 function cleanKp(x) {
@@ -2186,6 +2210,7 @@ function vSummary(r) {
   if (v.排便回数 || v.排便状態) x.push(`排便:${v.排便回数 ? v.排便回数 + '回' : ''}${v.排便状態 ? ' ' + v.排便状態 : ''}`);
   if (v.摂食) x.push(`摂食介助:${v.摂食}`); if (v.食事量) x.push(`食事量:${v.食事量}`); if (v.水分) x.push(`水分:${v.水分}cc`);
   if (v.部分浴) x.push(`部分浴:${v.部分浴}`); if (v.清拭) x.push(`清拭:${v.清拭}`); if ((v.整容 || []).length) x.push(`整容:${v.整容.join('・')}`);
+  if (v.献立) x.push(`献立:${v.献立}`);
   if (v.預り) x.push(`預り:${v.預り}円`); if (v.購入) x.push(`購入:${v.購入}円`); if (v.お釣) x.push(`お釣:${v.お釣}円`);
   x.push(`その他:${(v.その他 || []).join('・') || 'なし'}`);
   if (v.変更 === '有') x.push('予定変更:有'); if ((v.加算 || []).length) x.push(`加算:${v.加算.join('・')}`);
@@ -2221,6 +2246,7 @@ function renderVPop(i) {
   <div class="row" style="margin-top:4px">食事量 ${num('食事量', 70, '', 'text')}　水分補給 ${num('水分', 56, 'cc')}</div>
   <div class="cat">入浴・清拭／身体整容</div><div class="row chips">部分浴 ${radio('部分浴', ['手', '足'])}　清拭 ${radio('清拭', ['全身', '部分'])}</div>
   <div class="row chips" style="margin-top:4px">整容 ${multi('整容', ['爪', '耳', '髭', '髪', '化粧'])}</div>
+  <div class="cat">調理（献立）</div><div class="row"><input type="text" class="wide ${m.献立 == null && auto.献立 ? 'auto' : ''}" value="${esc(v.献立 || '')}" placeholder="例：肉じゃが・味噌汁" onchange="setVin(${i},'献立',this.value.trim())"></div>
   <div class="cat">買物等</div><div class="row">預り ${num('預り', 64, '円')} 購入 ${num('購入', 64, '円')} お釣 ${num('お釣', 64, '円')}</div>
   <div class="row" style="margin-top:4px">内訳 <input type="text" class="wide ${m.内訳 == null && auto.内訳 ? 'auto' : ''}" value="${esc(v.内訳 || '')}" onchange="setVin(${i},'内訳',this.value.trim())"></div>`;
 }
@@ -2438,7 +2464,7 @@ function genShogai(row) {
     if (!ctx.med && (has('服薬・医療|服薬介助・確認') || /服薬/.test(row.e.detail || ''))) s.push(pickF(SG.med));
   } else {
     const late = tod === '夕方' || tod === '夜';
-    if (ctx.cont) s.push(ctx.link('本人')); else { const op = pickF(SG_OPEN[tod] || SG.open); s.push(op); if (!AH.observe) s.push(pickF(SG.health.filter(x => !(/穏やか|落ち着/.test(op) && /穏やか|落ち着/.test(x))))); }
+    if (ctx.cont) s.push(ctx.link('本人')); else { const op = pickF((SG_OPEN[tod] || SG.open).filter(x => !/起床/.test(x) || has('起床・就寝|起床介助'))); s.push(op); if (!AH.observe) s.push(pickF(SG.health.filter(x => !(/穏やか|落ち着/.test(op) && /穏やか|落ち着/.test(x))))); }
     if (AH.observe && !seen(AH.observe)) s.push(o(AH.observe));
     // 予定の内容にある支援だけを書く（「起床介助等」のように「等」があれば身支度も含める）
     const det = row.e.detail || '', etc = /(起床|就寝)[^\n]*等/.test(det), dressOn = has('身体整容|更衣介助') || /更衣|着替/.test(det) || etc;
@@ -2479,7 +2505,7 @@ function genTokki(row) {
   const a = assessOf((state.name || '').trim()), dent = a && a.dentures;
   const sayOn = document.getElementById('recSay') ? document.getElementById('recSay').checked : true;
   const ctx = dayCtx(row);
-  const s = [ctx.cont ? ctx.link('利用者様', label === '入浴') : pickF(TK_OPEN[tod] || TK.open)];
+  const s = [ctx.cont ? ctx.link('利用者様', label === '入浴') : pickF((TK_OPEN[tod] || TK.open).filter(x => !/起床/.test(x) || kp.includes('起床・就寝|起床介助')))];
   const AH = assessHints(row, '利用者様'); AH.care = freshDay(AH.care); AH.life = freshDay(AH.life); AH.observe = freshDay(AH.observe); if (AH.observe && !seen(AH.observe)) s.push(o(AH.observe));
   let cat = tod;
   if (label === '入浴') {
