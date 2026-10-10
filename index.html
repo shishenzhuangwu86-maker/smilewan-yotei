@@ -394,7 +394,11 @@
         <span class="fixed">〜</span>
         <input type="date" id="recTo" style="font:inherit;padding:5px;border:1px solid var(--line);border-radius:5px">
       </div>
-      <label>担当者（全行に入ります・行ごとに変更可）</label>
+      <label>担当者（カイポケのシフトから自動で入ります）</label>
+      <div class="hint" id="shiftInfo" style="margin:0 0 4px">記録を作ると、シフト（利用者・日付・開始時刻）が合う担当者が入ります。</div>
+      <div class="row" style="margin-bottom:4px"><button class="small" onclick="fillStaffFromShift(true)">🔄 シフトから担当者を入れ直す</button><button class="small" onclick="document.getElementById('shiftFile').click()">📋 シフトCSVを取り込む</button></div>
+      <input type="file" id="shiftFile" accept=".csv,text/csv" style="display:none" onchange="importShiftCsv(this)">
+      <label style="font-weight:normal">シフトに無い訪問に入れる担当者</label>
       <div class="row">
         <select id="recStaff" onchange="lsSet('smilewan_staff',this.value); recRows.forEach(r=>{if(!r.staffEdited)r.staff=this.value}); if(recRows.length)renderRecordView();"></select>
         <button class="small fixed" onclick="editStaffList()">担当者を編集</button>
@@ -507,6 +511,7 @@
         <li>行ごとに確認・修正する
           <ul>
             <li><b>実施項目</b>：カイポケでチェックする項目が青く選ばれている。押すと外れ、「＋項目」でカイポケと同じ並びの一覧から足せる</li>
+            <li><b>担当者</b>：記録を作ると、カイポケのシフト（業務日誌ツールに取り込んだ月）から、利用者・日付・開始時刻（30分以内）が合うヘルパーが自動で入る。シフトが無い月は「📋 シフトCSVを取り込む」でカイポケのシフト予定表CSVを入れる。手で選び直した担当者はそのまま残る。「🔄 シフトから担当者を入れ直す」で入れ直せる</li>
             <li><b>チェック欄</b>：記録の右の「チェック」列に、記録欄の値（顔色・発汗・体温・血圧…）と、チェックした実施項目をカイポケと同じ並びで ☑ 表示（PDF・印刷・Wordにも出る。Wordでは各記録の下に小さい灰色の1行「チェック：…」。いらないときは「Word・PDFにチェック項目も入れる」を外す）。選び方：①予定表 ②アセスメント（洗髪介助・口腔清潔など）③文章に書いてある支援 ④記録欄の値 ⑤関連してセットで行う支援（入浴→更衣介助、通院→外出準備・帰宅受入、車いす→移乗介助、障害の声掛け→場面の小項目）。チェックにマウスを乗せると理由が出る（点線の下線＝関連で選んだ物）。調理の訪問は献立欄に料理名。「✎ 項目」で選び直し、「📝 記録欄」で数字を入れる。「📋」でカイポケ用にコピー</li>
             <li><b>📝記録欄</b>：カイポケの欄（顔色・発汗・体温・血圧・排尿／排便の回数・量・食事量・水分cc・部分浴・清拭・整容・買物の金額と内訳・その他・予定の変更・加算）。入れた数字は文章に自動で書き足され、消すと文章からも消える。文章に書いた体温・血圧・排尿／排便・食事量・水分cc・清拭・整容・金額なども自動で欄に入る（点線。文章を打っている途中でも反映）。押せば選び直せる</li>
             <li><b>🛒 買い物タブ</b>：利用者を選んで「🍱 献立と買い物リストを作る」。買い物リストはチェックしながら使える（チェックは保存され、他の端末でも同じ）。日用品にチェックすると「今日買った」になる。周期の設定は下の「⚙ 日用品の買う周期」を開く。「LINE用にコピー」「印刷」もある。</li>
@@ -1243,7 +1248,8 @@ function openSavedRecords() {
     .sort((a, b) => (b.date - a.date) || ((b.e.start || '') > (a.e.start || '') ? 1 : -1));
   const [y, m] = month.split('-').map(Number);
   document.getElementById('recFrom').value = `${month}-01`; document.getElementById('recTo').value = `${month}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
-  renderRecordView();
+  recRows.forEach(r => { if (!r.staff) r.staffEdited = false; }); // 担当者が空の記録はシフトから入れる
+  renderRecordView(); fillStaffFromShift();
 }
 // ===== アセスメント取込（全社協様式などの PDF。文字データ入りのPDFを読み、要点だけ保存） =====
 // 保存するのは判断に使う要点のみ（病名・義歯・要援助の項目・入浴介助・移動の補助具・特記の要点）。原文は保存しない
@@ -2602,7 +2608,62 @@ function buildRecords() {
     }
   }
   recRows.sort((a, b) => (b.date - a.date) || ((b.e.start || '') > (a.e.start || '') ? 1 : -1));
-  renderRecordView(); markRecDirty();
+  renderRecordView(); markRecDirty(); fillStaffFromShift();
+}
+
+// ===== 担当者：カイポケのシフト（業務日誌ツールに取り込んだ月＋このツールで取り込んだCSV）から自動で入れる =====
+//   業務日誌ツールの住所は公開ファイルに書かず、共有の設定（合言葉つき）shiftSource に置く
+const shiftCache = {};
+const normName = x => String(x || '').replace(/[\s　]/g, '');
+function parseShiftCsv(text) {
+  const lines = String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean), head = lines.shift().split(',').map(x => x.replace(/"/g, '').trim());
+  const ix = k => head.findIndex(h => h.includes(k)), H = ix('ヘルパー'), D = ix('日付'), C = ix('利用者'), S = ix('開始'), E = ix('終了');
+  if (H < 0 || C < 0 || S < 0) return [];
+  return lines.map(l => l.split(',').map(x => x.replace(/"/g, '').trim())).filter(a => a[C] && a[H]).map(a => ({ h: a[H], d: parseInt(String(a[D]).replace(/^.*[\/月-]/, ''), 10), c: a[C], s: a[S], e: a[E] || '' }));
+}
+async function loadShift(ym) {
+  if (shiftCache[ym]) return shiftCache[ym];
+  let rows = (getSetting('shift_' + ym, 'smilewan_shift_' + ym, []) || []).map(a => ({ h: a[0], d: +a[1], c: a[2], s: a[3], e: a[4] || '' }));
+  const src = (getSetting('shiftSource', 'smilewan_shift_src', []) || [])[0];
+  if (src) { try { const j = await (await fetch(src + '?json=1&run=shiftcsv&ym=' + ym)).json(); if (j && j.ok && j.csv) rows = rows.concat(parseShiftCsv(j.csv)); } catch {} }
+  return (shiftCache[ym] = rows);
+}
+const hm = x => { const m = String(x || '').match(/(\d{1,2}):(\d{2})/); return m ? +m[1] * 60 + +m[2] : null; };
+function shiftStaffFor(rows, name, date, start) {
+  const n = normName(name), sur = String(name || '').trim().split(/[\s　]+/)[0], day = date.getDate(), st = hm(start);
+  let cand = rows.filter(r => r.d === day && normName(r.c) === n);
+  // 名前の漢字違い（理揮／理暉 など）：その月に同じ名前が1件も無いときだけ、名字＋名前の1文字目が同じ人で探す（高山さんが複数いても取り違えない）
+  const given = String(name || '').trim().split(/[\s　]+/)[1] || '', similar = c => { const [a, b = ''] = String(c).trim().split(/[\s　]+/); return a === sur && b[0] && b[0] === given[0]; };
+  if (!cand.length && !rows.some(r => normName(r.c) === n) && new Set(rows.filter(r => similar(r.c)).map(r => r.c)).size === 1) cand = rows.filter(r => r.d === day && similar(r.c));
+  if (!cand.length || st == null) return '';
+  const diff = r => Math.abs((hm(r.s) ?? 9999) - st), best = Math.min(...cand.map(diff));
+  if (best > 30) return '';
+  return [...new Set(cand.filter(r => diff(r) === best).map(r => r.h))].join('・');
+}
+async function fillStaffFromShift(force) {
+  const name = (state.name || '').trim(), info = document.getElementById('shiftInfo'); if (!name || !recRows.length) return;
+  const yms = [...new Set(recRows.map(r => ymd(r.date).slice(0, 7)))];
+  const by = {}; for (const ym of yms) by[ym] = await loadShift(ym);
+  let n = 0, miss = 0;
+  recRows.forEach(r => {
+    if (!force && r.staffEdited && !r.staffFromShift && r.staff) return; // 手で選んだ担当者はそのまま
+    const st = shiftStaffFor(by[ymd(r.date).slice(0, 7)] || [], name, r.date, r.e.start);
+    if (st) { if (r.staff !== st) { r.staff = st; n++; } r.staffFromShift = true; r.staffEdited = true; } else miss++;
+  });
+  const have = yms.filter(ym => recRows.some(r => ymd(r.date).startsWith(ym) && shiftStaffFor(by[ym], name, r.date, r.e.start)));
+  if (info) info.textContent = have.length ? `シフトから担当者を入れました（${recRows.length - miss}件／${recRows.length}件）。${miss ? `シフトに無い${miss}件は下の担当者が入ります。` : ''}` : `この利用者の${yms.map(x => +x.slice(5) + '月').join('・')}のシフトがありません。業務日誌ツールに取り込むか「📋 シフトCSVを取り込む」で入れてください。`;
+  if (n) { renderRecordView(); markRecDirty(); }
+}
+async function importShiftCsv(input) {
+  const f = input.files[0]; input.value = ''; if (!f) return;
+  const buf = await f.arrayBuffer(); let text = new TextDecoder('shift_jis').decode(buf); if (!/ヘルパー|利用者/.test(text)) text = new TextDecoder('utf-8').decode(buf);
+  const rows = parseShiftCsv(text); if (!rows.length) { alert('シフトCSVとして読めませんでした（「ヘルパー名」「利用者」「開始時間」の列が必要です）'); return; }
+  const from = document.getElementById('recFrom').value || ymd(new Date()), ym = from.slice(0, 7);
+  if (!confirm(`${rows.length}件のシフトを ${+ym.slice(5)}月分として取り込みますか？\n（違う月なら、先に「期間」をその月にしてください）`)) return;
+  const prev = getSetting('shift_' + ym, 'smilewan_shift_' + ym, []) || [], key = a => a.slice(0, 4).join('|');
+  const merged = new Map(prev.map(a => [key(a), a])); rows.forEach(r => { const a = [r.h, r.d, r.c, r.s, r.e]; merged.set(key(a), a); });
+  await setSetting('shift_' + ym, 'smilewan_shift_' + ym, [...merged.values()]); delete shiftCache[ym];
+  await fillStaffFromShift(true); alert(`シフトを取り込みました（${+ym.slice(5)}月・${rows.length}件）`);
 }
 
 // ---- NG表現（含まれていたらアラーム。「NG表現を編集」で変更） ----
@@ -2704,7 +2765,7 @@ function renderRecordView() {
     <td class="dt">${String(r.date.getMonth() + 1).padStart(2, '0')} / ${String(r.date.getDate()).padStart(2, '0')}（${DAYS[r.date.getDay()]}）<br>
       <input type="time" value="${esc(r.e.start)}" onchange="recRows[${i}].e.start=this.value"> - <input type="time" value="${esc(r.e.end)}" onchange="recRows[${i}].e.end=this.value">
       ${r.flag ? `<span class="flag">${esc(r.flag)}</span>` : ''}</td>
-    <td class="staff"><select onchange="recRows[${i}].staff=this.value;recRows[${i}].staffEdited=true">${staffOptions(r.staff)}</select></td>
+    <td class="staff"><select onchange="recRows[${i}].staff=this.value;recRows[${i}].staffEdited=true;recRows[${i}].staffFromShift=false;markRecDirty()">${staffOptions(r.staff)}</select></td>
     <td class="kind">${r.kind}<br><small style="color:var(--muted)">${esc(r.e.type)}</small></td>
     <td class="txt">${ngIdx.has(i) ? ngHits(r.text).map(w => `<span class="ng-badge">NG「${esc(w)}」</span>`).join('') : ''}${dupIdx.has(i) ? `<span class="dup-badge">⚠ 同じ文章（${dupIdx.get(i)}）</span>` : ''}<textarea oninput="recRows[${i}].text=this.value;liveV(${i},this)" onchange="kpFromText(recRows[${i}]);renderRecordView();markRecDirty()">${esc(r.text)}</textarea></td>
     ${recCheckCell(r, i)}
